@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "heterocrowdnav"
+version = "0.1.0"
+description = "Robot navigation in heterogeneous crowds"
+authors = ["Yuxiang Gao <yuxiang.gao@jhu.edu>"]
+packages = [
+    { include = "crowd_nav" },
+    { include = "crowd_sim" }
+]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.10"
+torch = "^1.9.0"
+torch-vision = "^0.1.6-alpha.0"
+numpy = "^1.21.1"
+gym = "^0.18.3"
+matplotlib = "^3.4.2"
+GitPython = "^3.1.20"
+toml = "^0.10.2"
+scipy = "^1.7.1"
+socialforce = { git = "https://github.com/ChanganVR/socialforce.git" }
+pyrvo2 = { path = "thirdparty/pyrvo2" }
+
+[tool.poetry.dev-dependencies]
+pylint = "^2.9.6"
+black = "^21.7b0"
+pytest = "^6.2.4"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88

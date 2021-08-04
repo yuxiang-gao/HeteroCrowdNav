@@ -23,10 +23,16 @@ outperforming state-of-the-art methods.
 <img src="https://i.imgur.com/YOPHXD1.png" width="1000" />
 
 ## Setup
-1. Install [Python-RVO2](https://github.com/sybrenstuvel/Python-RVO2) library
+1. Build [Python-RVO2](https://github.com/sybrenstuvel/Python-RVO2) library
+```
+cd thirdparty/pyrvo2
+python setup.py egg_info
+python setup.py build
+```
+
 2. Install crowd_sim and crowd_nav into pip
 ```
-pip install -e .
+poetry install
 ```
 
 ## Getting Started
@@ -61,11 +67,11 @@ python utils/plot.py data/output/output.log
 
 
 ## Simulation Videos
-CADRL             | LSTM-RL
-:-------------------------:|:-------------------------:
-<img src="https://i.imgur.com/vrWsxPM.gif" width="400" />|<img src="https://i.imgur.com/6gjT0nG.gif" width="400" />
-SARL             |  OM-SARL
-<img src="https://i.imgur.com/rUtAGVP.gif" width="400" />|<img src="https://i.imgur.com/UXhcvZL.gif" width="400" />
+|                           CADRL                           |                          LSTM-RL                          |
+| :-------------------------------------------------------: | :-------------------------------------------------------: |
+| <img src="https://i.imgur.com/vrWsxPM.gif" width="400" /> | <img src="https://i.imgur.com/6gjT0nG.gif" width="400" /> |
+|                           SARL                            |                          OM-SARL                          |
+| <img src="https://i.imgur.com/rUtAGVP.gif" width="400" /> | <img src="https://i.imgur.com/UXhcvZL.gif" width="400" /> |
 
 
 ## Learning Curve

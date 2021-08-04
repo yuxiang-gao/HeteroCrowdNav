@@ -1,0 +1,3 @@
+[submodule "thirdparty/Python-RVO2"]
+	path = thirdparty/pyrvo2
+	url = https://github.com/yuxiang-gao/Python-RVO2.git
