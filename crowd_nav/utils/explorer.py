@@ -6,7 +6,9 @@ from crowd_sim.envs.utils.info import *
 
 
 class Explorer(object):
-    def __init__(self, env, robot, device, memory=None, gamma=None, target_policy=None):
+    def __init__(
+        self, env, robot, device, memory=None, gamma=None, target_policy=None
+    ):
         self.env = env
         self.robot = robot
         self.device = device
@@ -80,12 +82,17 @@ class Explorer(object):
             if update_memory:
                 if isinstance(info, ReachGoal) or isinstance(info, Collision):
                     # only add positive(success) or negative(collision) experience in experience set
-                    self.update_memory(states, actions, rewards, imitation_learning)
+                    self.update_memory(
+                        states, actions, rewards, imitation_learning
+                    )
 
             cumulative_rewards.append(
                 sum(
                     [
-                        pow(self.gamma, t * self.robot.time_step * self.robot.v_pref)
+                        pow(
+                            self.gamma,
+                            t * self.robot.time_step * self.robot.v_pref,
+                        )
                         * reward
                         for t, reward in enumerate(rewards)
                     ]
@@ -128,9 +135,12 @@ class Explorer(object):
 
         if print_failure:
             logging.info(
-                "Collision cases: " + " ".join([str(x) for x in collision_cases])
+                "Collision cases: "
+                + " ".join([str(x) for x in collision_cases])
             )
-            logging.info("Timeout cases: " + " ".join([str(x) for x in timeout_cases]))
+            logging.info(
+                "Timeout cases: " + " ".join([str(x) for x in timeout_cases])
+            )
 
     def update_memory(self, states, actions, rewards, imitation_learning=False):
         if self.memory is None or self.gamma is None:
@@ -148,7 +158,9 @@ class Explorer(object):
                     [
                         pow(
                             self.gamma,
-                            max(t - i, 0) * self.robot.time_step * self.robot.v_pref,
+                            max(t - i, 0)
+                            * self.robot.time_step
+                            * self.robot.v_pref,
                         )
                         * reward
                         * (1 if t >= i else 0)

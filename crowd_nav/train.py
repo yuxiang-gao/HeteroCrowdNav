@@ -18,8 +18,12 @@ def main():
     parser = argparse.ArgumentParser("Parse configuration file")
     parser.add_argument("--env_config", type=str, default="configs/env.config")
     parser.add_argument("--policy", type=str, default="cadrl")
-    parser.add_argument("--policy_config", type=str, default="configs/policy.config")
-    parser.add_argument("--train_config", type=str, default="configs/train.config")
+    parser.add_argument(
+        "--policy_config", type=str, default="configs/policy.config"
+    )
+    parser.add_argument(
+        "--train_config", type=str, default="configs/train.config"
+    )
     parser.add_argument("--output_dir", type=str, default="data/output")
     parser.add_argument("--weights", type=str)
     parser.add_argument("--resume", default=False, action="store_true")
@@ -30,7 +34,9 @@ def main():
     # configure paths
     make_new_dir = True
     if os.path.exists(args.output_dir):
-        key = input("Output directory already exists! Overwrite the folder? (y/n)")
+        key = input(
+            "Output directory already exists! Overwrite the folder? (y/n)"
+        )
         if key == "y" and not args.resume:
             shutil.rmtree(args.output_dir)
         else:
@@ -65,8 +71,12 @@ def main():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     repo = git.Repo(search_parent_directories=True)
-    logging.info("Current git head hash code: %s".format(repo.head.object.hexsha))
-    device = torch.device("cuda:0" if torch.cuda.is_available() and args.gpu else "cpu")
+    logging.info(
+        "Current git head hash code: %s".format(repo.head.object.hexsha)
+    )
+    device = torch.device(
+        "cuda:0" if torch.cuda.is_available() and args.gpu else "cpu"
+    )
     logging.info("Using device: %s", device)
 
     # configure policy
@@ -74,7 +84,9 @@ def main():
     if not policy.trainable:
         parser.error("Policy has to be trainable")
     if args.policy_config is None:
-        parser.error("Policy config has to be specified for a trainable network")
+        parser.error(
+            "Policy config has to be specified for a trainable network"
+        )
     policy_config = configparser.RawConfigParser()
     policy_config.read(args.policy_config)
     policy.configure(policy_config)
@@ -97,7 +109,9 @@ def main():
     train_batches = train_config.getint("train", "train_batches")
     train_episodes = train_config.getint("train", "train_episodes")
     sample_episodes = train_config.getint("train", "sample_episodes")
-    target_update_interval = train_config.getint("train", "target_update_interval")
+    target_update_interval = train_config.getint(
+        "train", "target_update_interval"
+    )
     evaluation_interval = train_config.getint("train", "evaluation_interval")
     capacity = train_config.getint("train", "capacity")
     epsilon_start = train_config.getfloat("train", "epsilon_start")
@@ -110,7 +124,9 @@ def main():
     model = policy.get_model()
     batch_size = train_config.getint("trainer", "batch_size")
     trainer = Trainer(model, memory, device, batch_size)
-    explorer = Explorer(env, robot, device, memory, policy.gamma, target_policy=policy)
+    explorer = Explorer(
+        env, robot, device, memory, policy.gamma, target_policy=policy
+    )
 
     # imitation learning
     if args.resume:
@@ -118,7 +134,9 @@ def main():
             logging.error("RL weights does not exist")
         model.load_state_dict(torch.load(rl_weight_file))
         rl_weight_file = os.path.join(args.output_dir, "resumed_rl_model.pth")
-        logging.info("Load reinforcement learning trained weights. Resume training")
+        logging.info(
+            "Load reinforcement learning trained weights. Resume training"
+        )
     elif os.path.exists(il_weight_file):
         model.load_state_dict(torch.load(il_weight_file))
         logging.info("Load imitation learning trained weights.")
@@ -133,7 +151,9 @@ def main():
         if robot.visible:
             safety_space = 0
         else:
-            safety_space = train_config.getfloat("imitation_learning", "safety_space")
+            safety_space = train_config.getfloat(
+                "imitation_learning", "safety_space"
+            )
         il_policy = policy_factory[il_policy]()
         il_policy.multiagent_training = policy.multiagent_training
         il_policy.safety_space = safety_space
@@ -173,7 +193,9 @@ def main():
 
         # evaluate the model
         if episode % evaluation_interval == 0:
-            explorer.run_k_episodes(env.case_size["val"], "val", episode=episode)
+            explorer.run_k_episodes(
+                env.case_size["val"], "val", episode=episode
+            )
 
         # sample k episodes into memory and optimize over the generated memory
         explorer.run_k_episodes(

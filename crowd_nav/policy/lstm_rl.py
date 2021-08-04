@@ -34,7 +34,9 @@ class ValueNetwork1(nn.Module):
 
 
 class ValueNetwork2(nn.Module):
-    def __init__(self, input_dim, self_state_dim, mlp1_dims, mlp_dims, lstm_hidden_dim):
+    def __init__(
+        self, input_dim, self_state_dim, mlp1_dims, mlp_dims, lstm_hidden_dim
+    ):
         super().__init__()
         self.self_state_dim = self_state_dim
         self.lstm_hidden_dim = lstm_hidden_dim
@@ -74,14 +76,18 @@ class LstmRL(MultiHumanRL):
 
     def configure(self, config):
         self.set_common_parameters(config)
-        mlp_dims = [int(x) for x in config.get("lstm_rl", "mlp2_dims").split(", ")]
+        mlp_dims = [
+            int(x) for x in config.get("lstm_rl", "mlp2_dims").split(", ")
+        ]
         global_state_dim = config.getint("lstm_rl", "global_state_dim")
         self.with_om = config.getboolean("lstm_rl", "with_om")
         with_interaction_module = config.getboolean(
             "lstm_rl", "with_interaction_module"
         )
         if with_interaction_module:
-            mlp1_dims = [int(x) for x in config.get("lstm_rl", "mlp1_dims").split(", ")]
+            mlp1_dims = [
+                int(x) for x in config.get("lstm_rl", "mlp1_dims").split(", ")
+            ]
             self.model = ValueNetwork2(
                 self.input_dim(),
                 self.self_state_dim,
@@ -91,9 +97,14 @@ class LstmRL(MultiHumanRL):
             )
         else:
             self.model = ValueNetwork1(
-                self.input_dim(), self.self_state_dim, mlp_dims, global_state_dim
+                self.input_dim(),
+                self.self_state_dim,
+                mlp_dims,
+                global_state_dim,
             )
-        self.multiagent_training = config.getboolean("lstm_rl", "multiagent_training")
+        self.multiagent_training = config.getboolean(
+            "lstm_rl", "multiagent_training"
+        )
         logging.info(
             "Policy: {}LSTM-RL {} pairwise interaction module".format(
                 "OM-" if self.with_om else "",

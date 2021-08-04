@@ -14,7 +14,9 @@ from crowd_sim.envs.policy.orca import ORCA
 def main():
     parser = argparse.ArgumentParser("Parse configuration file")
     parser.add_argument("--env_config", type=str, default="configs/env.config")
-    parser.add_argument("--policy_config", type=str, default="configs/policy.config")
+    parser.add_argument(
+        "--policy_config", type=str, default="configs/policy.config"
+    )
     parser.add_argument("--policy", type=str, default="orca")
     parser.add_argument("--model_dir", type=str, default=None)
     parser.add_argument("--il", default=False, action="store_true")
@@ -38,8 +40,12 @@ def main():
         if args.il:
             model_weights = os.path.join(args.model_dir, "il_model.pth")
         else:
-            if os.path.exists(os.path.join(args.model_dir, "resumed_rl_model.pth")):
-                model_weights = os.path.join(args.model_dir, "resumed_rl_model.pth")
+            if os.path.exists(
+                os.path.join(args.model_dir, "resumed_rl_model.pth")
+            ):
+                model_weights = os.path.join(
+                    args.model_dir, "resumed_rl_model.pth"
+                )
             else:
                 model_weights = os.path.join(args.model_dir, "rl_model.pth")
     else:
@@ -52,7 +58,9 @@ def main():
         format="%(asctime)s, %(levelname)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    device = torch.device("cuda:0" if torch.cuda.is_available() and args.gpu else "cpu")
+    device = torch.device(
+        "cuda:0" if torch.cuda.is_available() and args.gpu else "cpu"
+    )
     logging.info("Using device: %s", device)
 
     # configure policy
@@ -104,7 +112,8 @@ def main():
             ob, _, done, info = env.step(action)
             current_pos = np.array(robot.get_position())
             logging.debug(
-                "Speed: %.2f", np.linalg.norm(current_pos - last_pos) / robot.time_step
+                "Speed: %.2f",
+                np.linalg.norm(current_pos - last_pos) / robot.time_step,
             )
             last_pos = current_pos
         if args.traj:
@@ -113,7 +122,9 @@ def main():
             env.render("video", args.video_file)
 
         logging.info(
-            "It takes %.2f seconds to finish. Final status is %s", env.global_time, info
+            "It takes %.2f seconds to finish. Final status is %s",
+            env.global_time,
+            info,
         )
         if robot.visible and info == "reach goal":
             human_times = env.get_human_times()

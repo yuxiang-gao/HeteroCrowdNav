@@ -18,7 +18,9 @@ class Agent(object):
         self.radius = config.getfloat(section, "radius")
         self.policy = policy_factory[config.get(section, "policy")]()
         self.sensor = config.get(section, "sensor")
-        self.kinematics = self.policy.kinematics if self.policy is not None else None
+        self.kinematics = (
+            self.policy.kinematics if self.policy is not None else None
+        )
         self.px = None
         self.py = None
         self.gx = None
@@ -149,6 +151,9 @@ class Agent(object):
 
     def reached_destination(self):
         return (
-            norm(np.array(self.get_position()) - np.array(self.get_goal_position()))
+            norm(
+                np.array(self.get_position())
+                - np.array(self.get_goal_position())
+            )
             < self.radius
         )

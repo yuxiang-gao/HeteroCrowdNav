@@ -61,13 +61,17 @@ class ValueNetwork(nn.Module):
         else:
             attention_input = mlp1_output
         scores = (
-            self.attention(attention_input).view(size[0], size[1], 1).squeeze(dim=2)
+            self.attention(attention_input)
+            .view(size[0], size[1], 1)
+            .squeeze(dim=2)
         )
 
         # masked softmax
         # weights = softmax(scores, dim=1).unsqueeze(2)
         scores_exp = torch.exp(scores) * (scores != 0).float()
-        weights = (scores_exp / torch.sum(scores_exp, dim=1, keepdim=True)).unsqueeze(2)
+        weights = (
+            scores_exp / torch.sum(scores_exp, dim=1, keepdim=True)
+        ).unsqueeze(2)
         self.attention_weights = weights[0, :, 0].data.cpu().numpy()
 
         # output feature is a linear combination of input features
@@ -89,9 +93,15 @@ class SARL(MultiHumanRL):
 
     def configure(self, config):
         self.set_common_parameters(config)
-        mlp1_dims = [int(x) for x in config.get("sarl", "mlp1_dims").split(", ")]
-        mlp2_dims = [int(x) for x in config.get("sarl", "mlp2_dims").split(", ")]
-        mlp3_dims = [int(x) for x in config.get("sarl", "mlp3_dims").split(", ")]
+        mlp1_dims = [
+            int(x) for x in config.get("sarl", "mlp1_dims").split(", ")
+        ]
+        mlp2_dims = [
+            int(x) for x in config.get("sarl", "mlp2_dims").split(", ")
+        ]
+        mlp3_dims = [
+            int(x) for x in config.get("sarl", "mlp3_dims").split(", ")
+        ]
         attention_dims = [
             int(x) for x in config.get("sarl", "attention_dims").split(", ")
         ]
@@ -108,7 +118,9 @@ class SARL(MultiHumanRL):
             self.cell_size,
             self.cell_num,
         )
-        self.multiagent_training = config.getboolean("sarl", "multiagent_training")
+        self.multiagent_training = config.getboolean(
+            "sarl", "multiagent_training"
+        )
         if self.with_om:
             self.name = "OM-SARL"
         logging.info(

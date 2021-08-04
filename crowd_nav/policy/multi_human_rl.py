@@ -17,17 +17,25 @@ class MultiHumanRL(CADRL):
         if self.phase is None or self.device is None:
             raise AttributeError("Phase, device attributes have to be set!")
         if self.phase == "train" and self.epsilon is None:
-            raise AttributeError("Epsilon attribute has to be set in training phase")
+            raise AttributeError(
+                "Epsilon attribute has to be set in training phase"
+            )
 
         if self.reach_destination(state):
-            return ActionXY(0, 0) if self.kinematics == "holonomic" else ActionRot(0, 0)
+            return (
+                ActionXY(0, 0)
+                if self.kinematics == "holonomic"
+                else ActionRot(0, 0)
+            )
         if self.action_space is None:
             self.build_action_space(state.self_state.v_pref)
 
         occupancy_maps = None
         probability = np.random.random()
         if self.phase == "train" and probability < self.epsilon:
-            max_action = self.action_space[np.random.choice(len(self.action_space))]
+            max_action = self.action_space[
+                np.random.choice(len(self.action_space))
+            ]
         else:
             self.action_values = list()
             max_value = float("-inf")
@@ -35,17 +43,23 @@ class MultiHumanRL(CADRL):
             for action in self.action_space:
                 next_self_state = self.propagate(state.self_state, action)
                 if self.query_env:
-                    next_human_states, reward, done, info = self.env.onestep_lookahead(
-                        action
-                    )
+                    (
+                        next_human_states,
+                        reward,
+                        done,
+                        info,
+                    ) = self.env.onestep_lookahead(action)
                 else:
                     next_human_states = [
                         self.propagate(
-                            human_state, ActionXY(human_state.vx, human_state.vy)
+                            human_state,
+                            ActionXY(human_state.vx, human_state.vy),
                         )
                         for human_state in state.human_states
                     ]
-                    reward = self.compute_reward(next_self_state, next_human_states)
+                    reward = self.compute_reward(
+                        next_self_state, next_human_states
+                    )
                 batch_next_states = torch.cat(
                     [
                         torch.Tensor([next_self_state + next_human_state]).to(
@@ -55,14 +69,17 @@ class MultiHumanRL(CADRL):
                     ],
                     dim=0,
                 )
-                rotated_batch_input = self.rotate(batch_next_states).unsqueeze(0)
+                rotated_batch_input = self.rotate(batch_next_states).unsqueeze(
+                    0
+                )
                 if self.with_om:
                     if occupancy_maps is None:
                         occupancy_maps = self.build_occupancy_maps(
                             next_human_states
                         ).unsqueeze(0)
                     rotated_batch_input = torch.cat(
-                        [rotated_batch_input, occupancy_maps.to(self.device)], dim=2
+                        [rotated_batch_input, occupancy_maps.to(self.device)],
+                        dim=2,
                     )
                 # VALUE UPDATE
                 next_state_value = self.model(rotated_batch_input).data.item()
@@ -100,7 +117,9 @@ class MultiHumanRL(CADRL):
                 dmin = dist
 
         # check if reaching the goal
-        reaching_goal = np.linalg.norm((nav.px - nav.gx, nav.py - nav.gy)) < nav.radius
+        reaching_goal = (
+            np.linalg.norm((nav.px - nav.gx, nav.py - nav.gy)) < nav.radius
+        )
         if collision:
             reward = -0.25
         elif reaching_goal:
@@ -129,7 +148,8 @@ class MultiHumanRL(CADRL):
         if self.with_om:
             occupancy_maps = self.build_occupancy_maps(state.human_states)
             state_tensor = torch.cat(
-                [self.rotate(state_tensor), occupancy_maps.to(self.device)], dim=1
+                [self.rotate(state_tensor), occupancy_maps.to(self.device)],
+                dim=1,
             )
         else:
             state_tensor = self.rotate(state_tensor)
@@ -176,8 +196,12 @@ class MultiHumanRL(CADRL):
             other_py = np.sin(rotation) * distance
 
             # compute indices of humans in the grid
-            other_x_index = np.floor(other_px / self.cell_size + self.cell_num / 2)
-            other_y_index = np.floor(other_py / self.cell_size + self.cell_num / 2)
+            other_x_index = np.floor(
+                other_px / self.cell_size + self.cell_num / 2
+            )
+            other_y_index = np.floor(
+                other_py / self.cell_size + self.cell_num / 2
+            )
             other_x_index[other_x_index < 0] = float("-inf")
             other_x_index[other_x_index >= self.cell_num] = float("-inf")
             other_y_index[other_y_index < 0] = float("-inf")
@@ -195,7 +219,10 @@ class MultiHumanRL(CADRL):
                 speed = np.linalg.norm(other_humans[:, 2:4], axis=1)
                 other_vx = np.cos(rotation) * speed
                 other_vy = np.sin(rotation) * speed
-                dm = [list() for _ in range(self.cell_num ** 2 * self.om_channel_size)]
+                dm = [
+                    list()
+                    for _ in range(self.cell_num ** 2 * self.om_channel_size)
+                ]
                 for i, index in np.ndenumerate(grid_indices):
                     if index in range(self.cell_num ** 2):
                         if self.om_channel_size == 2:

@@ -58,7 +58,9 @@ class CADRL(Policy):
         self.set_common_parameters(config)
         mlp_dims = [int(x) for x in config.get("cadrl", "mlp_dims").split(", ")]
         self.model = ValueNetwork(self.joint_state_dim, mlp_dims)
-        self.multiagent_training = config.getboolean("cadrl", "multiagent_training")
+        self.multiagent_training = config.getboolean(
+            "cadrl", "multiagent_training"
+        )
         logging.info("Policy: CADRL without occupancy map")
 
     def set_common_parameters(self, config):
@@ -66,7 +68,9 @@ class CADRL(Policy):
         self.kinematics = config.get("action_space", "kinematics")
         self.sampling = config.get("action_space", "sampling")
         self.speed_samples = config.getint("action_space", "speed_samples")
-        self.rotation_samples = config.getint("action_space", "rotation_samples")
+        self.rotation_samples = config.getint(
+            "action_space", "rotation_samples"
+        )
         self.query_env = config.getboolean("action_space", "query_env")
         self.cell_num = config.getint("om", "cell_num")
         self.cell_size = config.getfloat("om", "cell_size")
@@ -89,9 +93,13 @@ class CADRL(Policy):
             for i in range(self.speed_samples)
         ]
         if holonomic:
-            rotations = np.linspace(0, 2 * np.pi, self.rotation_samples, endpoint=False)
+            rotations = np.linspace(
+                0, 2 * np.pi, self.rotation_samples, endpoint=False
+            )
         else:
-            rotations = np.linspace(-np.pi / 4, np.pi / 4, self.rotation_samples)
+            rotations = np.linspace(
+                -np.pi / 4, np.pi / 4, self.rotation_samples
+            )
 
         action_space = [ActionXY(0, 0) if holonomic else ActionRot(0, 0)]
         for rotation, speed in itertools.product(rotations, speeds):
@@ -164,16 +172,24 @@ class CADRL(Policy):
         if self.phase is None or self.device is None:
             raise AttributeError("Phase, device attributes have to be set!")
         if self.phase == "train" and self.epsilon is None:
-            raise AttributeError("Epsilon attribute has to be set in training phase")
+            raise AttributeError(
+                "Epsilon attribute has to be set in training phase"
+            )
 
         if self.reach_destination(state):
-            return ActionXY(0, 0) if self.kinematics == "holonomic" else ActionRot(0, 0)
+            return (
+                ActionXY(0, 0)
+                if self.kinematics == "holonomic"
+                else ActionRot(0, 0)
+            )
         if self.action_space is None:
             self.build_action_space(state.self_state.v_pref)
 
         probability = np.random.random()
         if self.phase == "train" and probability < self.epsilon:
-            max_action = self.action_space[np.random.choice(len(self.action_space))]
+            max_action = self.action_space[
+                np.random.choice(len(self.action_space))
+            ]
         else:
             self.action_values = list()
             max_min_value = float("-inf")
@@ -216,7 +232,9 @@ class CADRL(Policy):
         :return: tensor of shape (len(state), )
         """
         assert len(state.human_states) == 1
-        state = torch.Tensor(state.self_state + state.human_states[0]).to(self.device)
+        state = torch.Tensor(state.self_state + state.human_states[0]).to(
+            self.device
+        )
         state = self.rotate(state.unsqueeze(0)).squeeze(dim=0)
         return state
 
@@ -235,12 +253,12 @@ class CADRL(Policy):
 
         dg = torch.norm(torch.cat([dx, dy], dim=1), 2, dim=1, keepdim=True)
         v_pref = state[:, 7].reshape((batch, -1))
-        vx = (state[:, 2] * torch.cos(rot) + state[:, 3] * torch.sin(rot)).reshape(
-            (batch, -1)
-        )
-        vy = (state[:, 3] * torch.cos(rot) - state[:, 2] * torch.sin(rot)).reshape(
-            (batch, -1)
-        )
+        vx = (
+            state[:, 2] * torch.cos(rot) + state[:, 3] * torch.sin(rot)
+        ).reshape((batch, -1))
+        vy = (
+            state[:, 3] * torch.cos(rot) - state[:, 2] * torch.sin(rot)
+        ).reshape((batch, -1))
 
         radius = state[:, 4].reshape((batch, -1))
         if self.kinematics == "unicycle":
@@ -248,12 +266,12 @@ class CADRL(Policy):
         else:
             # set theta to be zero since it's not used
             theta = torch.zeros_like(v_pref)
-        vx1 = (state[:, 11] * torch.cos(rot) + state[:, 12] * torch.sin(rot)).reshape(
-            (batch, -1)
-        )
-        vy1 = (state[:, 12] * torch.cos(rot) - state[:, 11] * torch.sin(rot)).reshape(
-            (batch, -1)
-        )
+        vx1 = (
+            state[:, 11] * torch.cos(rot) + state[:, 12] * torch.sin(rot)
+        ).reshape((batch, -1))
+        vy1 = (
+            state[:, 12] * torch.cos(rot) - state[:, 11] * torch.sin(rot)
+        ).reshape((batch, -1))
         px1 = (state[:, 9] - state[:, 0]) * torch.cos(rot) + (
             state[:, 10] - state[:, 1]
         ) * torch.sin(rot)
