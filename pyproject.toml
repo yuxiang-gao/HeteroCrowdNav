@@ -20,6 +20,7 @@ toml = "^0.10.2"
 scipy = "^1.7.1"
 socialforce = { git = "https://github.com/ChanganVR/socialforce.git" }
 pyrvo2 = { path = "thirdparty/pyrvo2" }
+tqdm = "^4.62.0"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.9.6"

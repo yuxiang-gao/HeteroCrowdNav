@@ -23,14 +23,16 @@ outperforming state-of-the-art methods.
 <img src="https://i.imgur.com/YOPHXD1.png" width="1000" />
 
 ## Setup
-1. Build [Python-RVO2](https://github.com/sybrenstuvel/Python-RVO2) library
+1. Clone repo
+```
+git clone --recursive git@github.com:yuxiang-gao/HeteroCrowdNav.git
+```
+2. Setup pyrvo2
 ```
 cd thirdparty/pyrvo2
 python setup.py egg_info
-python setup.py build
 ```
-
-2. Install crowd_sim and crowd_nav into pip
+3. Install using poetry
 ```
 poetry install
 ```
