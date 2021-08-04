@@ -22,7 +22,7 @@ class ValueNetwork1(nn.Module):
         :return:
         """
         size = state.shape
-        self_state = state[:, 0, :self.self_state_dim]
+        self_state = state[:, 0, : self.self_state_dim]
         # human_state = state[:, :, self.self_state_dim:]
         h0 = torch.zeros(1, size[0], self.lstm_hidden_dim)
         c0 = torch.zeros(1, size[0], self.lstm_hidden_dim)
@@ -50,7 +50,7 @@ class ValueNetwork2(nn.Module):
         :return:
         """
         size = state.shape
-        self_state = state[:, 0, :self.self_state_dim]
+        self_state = state[:, 0, : self.self_state_dim]
 
         state = torch.reshape(state, (-1, size[2]))
         mlp1_output = self.mlp1(state)
@@ -68,24 +68,38 @@ class ValueNetwork2(nn.Module):
 class LstmRL(MultiHumanRL):
     def __init__(self):
         super().__init__()
-        self.name = 'LSTM-RL'
+        self.name = "LSTM-RL"
         self.with_interaction_module = None
         self.interaction_module_dims = None
 
     def configure(self, config):
         self.set_common_parameters(config)
-        mlp_dims = [int(x) for x in config.get('lstm_rl', 'mlp2_dims').split(', ')]
-        global_state_dim = config.getint('lstm_rl', 'global_state_dim')
-        self.with_om = config.getboolean('lstm_rl', 'with_om')
-        with_interaction_module = config.getboolean('lstm_rl', 'with_interaction_module')
+        mlp_dims = [int(x) for x in config.get("lstm_rl", "mlp2_dims").split(", ")]
+        global_state_dim = config.getint("lstm_rl", "global_state_dim")
+        self.with_om = config.getboolean("lstm_rl", "with_om")
+        with_interaction_module = config.getboolean(
+            "lstm_rl", "with_interaction_module"
+        )
         if with_interaction_module:
-            mlp1_dims = [int(x) for x in config.get('lstm_rl', 'mlp1_dims').split(', ')]
-            self.model = ValueNetwork2(self.input_dim(), self.self_state_dim, mlp1_dims, mlp_dims, global_state_dim)
+            mlp1_dims = [int(x) for x in config.get("lstm_rl", "mlp1_dims").split(", ")]
+            self.model = ValueNetwork2(
+                self.input_dim(),
+                self.self_state_dim,
+                mlp1_dims,
+                mlp_dims,
+                global_state_dim,
+            )
         else:
-            self.model = ValueNetwork1(self.input_dim(), self.self_state_dim, mlp_dims, global_state_dim)
-        self.multiagent_training = config.getboolean('lstm_rl', 'multiagent_training')
-        logging.info('Policy: {}LSTM-RL {} pairwise interaction module'.format(
-            'OM-' if self.with_om else '', 'w/' if with_interaction_module else 'w/o'))
+            self.model = ValueNetwork1(
+                self.input_dim(), self.self_state_dim, mlp_dims, global_state_dim
+            )
+        self.multiagent_training = config.getboolean("lstm_rl", "multiagent_training")
+        logging.info(
+            "Policy: {}LSTM-RL {} pairwise interaction module".format(
+                "OM-" if self.with_om else "",
+                "w/" if with_interaction_module else "w/o",
+            )
+        )
 
     def predict(self, state):
         """
@@ -98,8 +112,9 @@ class LstmRL(MultiHumanRL):
 
         def dist(human):
             # sort human order by decreasing distance to the robot
-            return np.linalg.norm(np.array(human.position) - np.array(state.self_state.position))
+            return np.linalg.norm(
+                np.array(human.position) - np.array(state.self_state.position)
+            )
 
         state.human_states = sorted(state.human_states, key=dist, reverse=True)
         return super().predict(state)
-

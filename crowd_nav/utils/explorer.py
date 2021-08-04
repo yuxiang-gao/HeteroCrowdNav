@@ -85,7 +85,8 @@ class Explorer(object):
             cumulative_rewards.append(
                 sum(
                     [
-                        pow(self.gamma, t * self.robot.time_step * self.robot.v_pref) * reward
+                        pow(self.gamma, t * self.robot.time_step * self.robot.v_pref)
+                        * reward
                         for t, reward in enumerate(rewards)
                     ]
                 )
@@ -98,7 +99,9 @@ class Explorer(object):
         collision_rate = collision / k
         assert success + collision + timeout == k
         avg_nav_time = (
-            sum(success_times) / len(success_times) if success_times else self.env.time_limit
+            sum(success_times) / len(success_times)
+            if success_times
+            else self.env.time_limit
         )
 
         extra_info = "" if episode is None else "in episode {} ".format(episode)
@@ -113,7 +116,10 @@ class Explorer(object):
             )
         )
         if phase in ["val", "test"]:
-            num_step = sum(success_times + collision_times + timeout_times) / self.robot.time_step
+            num_step = (
+                sum(success_times + collision_times + timeout_times)
+                / self.robot.time_step
+            )
             logging.info(
                 "Frequency of being in danger: %.2f and average min separate distance in danger: %.2f",
                 too_close / num_step,
@@ -121,7 +127,9 @@ class Explorer(object):
             )
 
         if print_failure:
-            logging.info("Collision cases: " + " ".join([str(x) for x in collision_cases]))
+            logging.info(
+                "Collision cases: " + " ".join([str(x) for x in collision_cases])
+            )
             logging.info("Timeout cases: " + " ".join([str(x) for x in timeout_cases]))
 
     def update_memory(self, states, actions, rewards, imitation_learning=False):
@@ -138,7 +146,10 @@ class Explorer(object):
                 # value = pow(self.gamma, (len(states) - 1 - i) * self.robot.time_step * self.robot.v_pref)
                 value = sum(
                     [
-                        pow(self.gamma, max(t - i, 0) * self.robot.time_step * self.robot.v_pref)
+                        pow(
+                            self.gamma,
+                            max(t - i, 0) * self.robot.time_step * self.robot.v_pref,
+                        )
                         * reward
                         * (1 if t >= i else 0)
                         for t, reward in enumerate(rewards)
@@ -150,9 +161,13 @@ class Explorer(object):
                     value = reward
                 else:
                     next_state = states[i + 1]
-                    gamma_bar = pow(self.gamma, self.robot.time_step * self.robot.v_pref)
+                    gamma_bar = pow(
+                        self.gamma, self.robot.time_step * self.robot.v_pref
+                    )
                     value = (
-                        reward + gamma_bar * self.target_model(next_state.unsqueeze(0)).data.item()
+                        reward
+                        + gamma_bar
+                        * self.target_model(next_state.unsqueeze(0)).data.item()
                     )
             value = torch.Tensor([value]).to(self.device)
 

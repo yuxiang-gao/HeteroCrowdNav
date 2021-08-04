@@ -7,6 +7,6 @@ def none_policy():
 
 
 policy_factory = dict()
-policy_factory['linear'] = Linear
-policy_factory['orca'] = ORCA
-policy_factory['none'] = none_policy
+policy_factory["linear"] = Linear
+policy_factory["orca"] = ORCA
+policy_factory["none"] = none_policy

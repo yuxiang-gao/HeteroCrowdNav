@@ -53,10 +53,10 @@ class ORCA(Policy):
 
         """
         super().__init__()
-        self.name = 'ORCA'
+        self.name = "ORCA"
         self.trainable = False
         self.multiagent_training = None
-        self.kinematics = 'holonomic'
+        self.kinematics = "holonomic"
         self.safety_space = 0
         self.neighbor_dist = 10
         self.max_neighbors = 10
@@ -91,17 +91,37 @@ class ORCA(Policy):
         :return:
         """
         self_state = state.self_state
-        params = self.neighbor_dist, self.max_neighbors, self.time_horizon, self.time_horizon_obst
-        if self.sim is not None and self.sim.getNumAgents() != len(state.human_states) + 1:
+        params = (
+            self.neighbor_dist,
+            self.max_neighbors,
+            self.time_horizon,
+            self.time_horizon_obst,
+        )
+        if (
+            self.sim is not None
+            and self.sim.getNumAgents() != len(state.human_states) + 1
+        ):
             del self.sim
             self.sim = None
         if self.sim is None:
-            self.sim = rvo2.PyRVOSimulator(self.time_step, *params, self.radius, self.max_speed)
-            self.sim.addAgent(self_state.position, *params, self_state.radius + 0.01 + self.safety_space,
-                              self_state.v_pref, self_state.velocity)
+            self.sim = rvo2.PyRVOSimulator(
+                self.time_step, *params, self.radius, self.max_speed
+            )
+            self.sim.addAgent(
+                self_state.position,
+                *params,
+                self_state.radius + 0.01 + self.safety_space,
+                self_state.v_pref,
+                self_state.velocity
+            )
             for human_state in state.human_states:
-                self.sim.addAgent(human_state.position, *params, human_state.radius + 0.01 + self.safety_space,
-                                  self.max_speed, human_state.velocity)
+                self.sim.addAgent(
+                    human_state.position,
+                    *params,
+                    human_state.radius + 0.01 + self.safety_space,
+                    self.max_speed,
+                    human_state.velocity
+                )
         else:
             self.sim.setAgentPosition(0, self_state.position)
             self.sim.setAgentVelocity(0, self_state.velocity)
@@ -110,7 +130,9 @@ class ORCA(Policy):
                 self.sim.setAgentVelocity(i + 1, human_state.velocity)
 
         # Set the preferred velocity to be a vector of unit magnitude (speed) in the direction of the goal.
-        velocity = np.array((self_state.gx - self_state.px, self_state.gy - self_state.py))
+        velocity = np.array(
+            (self_state.gx - self_state.px, self_state.gy - self_state.py)
+        )
         speed = np.linalg.norm(velocity)
         pref_vel = velocity / speed if speed > 1 else velocity
 

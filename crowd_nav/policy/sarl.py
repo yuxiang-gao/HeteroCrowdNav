@@ -7,8 +7,18 @@ from crowd_nav.policy.multi_human_rl import MultiHumanRL
 
 
 class ValueNetwork(nn.Module):
-    def __init__(self, input_dim, self_state_dim, mlp1_dims, mlp2_dims, mlp3_dims, attention_dims, with_global_state,
-                 cell_size, cell_num):
+    def __init__(
+        self,
+        input_dim,
+        self_state_dim,
+        mlp1_dims,
+        mlp2_dims,
+        mlp3_dims,
+        attention_dims,
+        with_global_state,
+        cell_size,
+        cell_num,
+    ):
         super().__init__()
         self.self_state_dim = self_state_dim
         self.global_state_dim = mlp1_dims[-1]
@@ -33,19 +43,26 @@ class ValueNetwork(nn.Module):
         :return:
         """
         size = state.shape
-        self_state = state[:, 0, :self.self_state_dim]
+        self_state = state[:, 0, : self.self_state_dim]
         mlp1_output = self.mlp1(state.view((-1, size[2])))
         mlp2_output = self.mlp2(mlp1_output)
 
         if self.with_global_state:
             # compute attention scores
-            global_state = torch.mean(mlp1_output.view(size[0], size[1], -1), 1, keepdim=True)
-            global_state = global_state.expand((size[0], size[1], self.global_state_dim)).\
-                contiguous().view(-1, self.global_state_dim)
+            global_state = torch.mean(
+                mlp1_output.view(size[0], size[1], -1), 1, keepdim=True
+            )
+            global_state = (
+                global_state.expand((size[0], size[1], self.global_state_dim))
+                .contiguous()
+                .view(-1, self.global_state_dim)
+            )
             attention_input = torch.cat([mlp1_output, global_state], dim=1)
         else:
             attention_input = mlp1_output
-        scores = self.attention(attention_input).view(size[0], size[1], 1).squeeze(dim=2)
+        scores = (
+            self.attention(attention_input).view(size[0], size[1], 1).squeeze(dim=2)
+        )
 
         # masked softmax
         # weights = softmax(scores, dim=1).unsqueeze(2)
@@ -68,22 +85,37 @@ class ValueNetwork(nn.Module):
 class SARL(MultiHumanRL):
     def __init__(self):
         super().__init__()
-        self.name = 'SARL'
+        self.name = "SARL"
 
     def configure(self, config):
         self.set_common_parameters(config)
-        mlp1_dims = [int(x) for x in config.get('sarl', 'mlp1_dims').split(', ')]
-        mlp2_dims = [int(x) for x in config.get('sarl', 'mlp2_dims').split(', ')]
-        mlp3_dims = [int(x) for x in config.get('sarl', 'mlp3_dims').split(', ')]
-        attention_dims = [int(x) for x in config.get('sarl', 'attention_dims').split(', ')]
-        self.with_om = config.getboolean('sarl', 'with_om')
-        with_global_state = config.getboolean('sarl', 'with_global_state')
-        self.model = ValueNetwork(self.input_dim(), self.self_state_dim, mlp1_dims, mlp2_dims, mlp3_dims,
-                                  attention_dims, with_global_state, self.cell_size, self.cell_num)
-        self.multiagent_training = config.getboolean('sarl', 'multiagent_training')
+        mlp1_dims = [int(x) for x in config.get("sarl", "mlp1_dims").split(", ")]
+        mlp2_dims = [int(x) for x in config.get("sarl", "mlp2_dims").split(", ")]
+        mlp3_dims = [int(x) for x in config.get("sarl", "mlp3_dims").split(", ")]
+        attention_dims = [
+            int(x) for x in config.get("sarl", "attention_dims").split(", ")
+        ]
+        self.with_om = config.getboolean("sarl", "with_om")
+        with_global_state = config.getboolean("sarl", "with_global_state")
+        self.model = ValueNetwork(
+            self.input_dim(),
+            self.self_state_dim,
+            mlp1_dims,
+            mlp2_dims,
+            mlp3_dims,
+            attention_dims,
+            with_global_state,
+            self.cell_size,
+            self.cell_num,
+        )
+        self.multiagent_training = config.getboolean("sarl", "multiagent_training")
         if self.with_om:
-            self.name = 'OM-SARL'
-        logging.info('Policy: {} {} global state'.format(self.name, 'w/' if with_global_state else 'w/o'))
+            self.name = "OM-SARL"
+        logging.info(
+            "Policy: {} {} global state".format(
+                self.name, "w/" if with_global_state else "w/o"
+            )
+        )
 
     def get_attention_weights(self):
         return self.model.attention_weights
