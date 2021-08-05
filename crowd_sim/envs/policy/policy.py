@@ -1,8 +1,9 @@
-import abc
+from abc import ABC, abstractmethod
 import numpy as np
+import torch
 
 
-class Policy(object):
+class Policy(ABC):
     def __init__(self):
         """
         Base class for all policies, has an abstract method predict().
@@ -16,7 +17,7 @@ class Policy(object):
         # if agent is assumed to know the dynamics of real world
         self.env = None
 
-    @abc.abstractmethod
+    @abstractmethod
     def configure(self, config):
         return
 
@@ -29,10 +30,25 @@ class Policy(object):
     def set_env(self, env):
         self.env = env
 
+    def set_time_step(self, time_step):
+        self.time_step = time_step
+
     def get_model(self):
         return self.model
 
-    @abc.abstractmethod
+    def save_model(self, file):
+        torch.save(self.model.state_dict(), file)
+
+    def load_model(self, file):
+        self.model.load_state_dict(torch.load(file))
+
+    def get_state_dict(self):
+        return self.model.state_dict()
+
+    def load_state_dict(self, state_dict):
+        self.model.load_state_dict(state_dict)
+
+    @abstractmethod
     def predict(self, state):
         """
         Policy takes state as input and output an action
