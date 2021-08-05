@@ -112,13 +112,12 @@ class VNRLTrainer(Trainer):
     def optimize_batch(self, num_batches, episode=None):
         if self.optimizer is None:
             raise ValueError("Learning rate is not set!")
-        logging.info(f"{self.memory.position} - {self.memory.capacity}")
         if self.data_loader is None:
             self.data_loader = DataLoader(
                 self.memory, self.batch_size, shuffle=True
             )
         losses = 0
-        pbar = tqdm(self.data_loader)
+        pbar = tqdm(self.data_loader, total=num_batches)
         # batch_count = 0
         for batch_count, (inputs, values, rewards, next_states) in enumerate(
             pbar
@@ -140,7 +139,6 @@ class VNRLTrainer(Trainer):
             pbar.set_description(f"Episode [{episode}]")
             pbar.set_postfix(loss=loss.data.item())
 
-            batch_count += 1
             if batch_count > num_batches:
                 break
 

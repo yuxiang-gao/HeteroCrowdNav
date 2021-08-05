@@ -148,18 +148,20 @@ class Explorer(object):
             if epoch is None
             else extra_info + " in epoch {} ".format(epoch)
         )
-        logging.info(
-            "{:<5} {}has success rate: {:.2f}, collision rate: {:.2f}, nav time: {:.2f}, total reward: {:.4f},"
-            " average return: {:.4f}".format(
-                phase.upper(),
-                extra_info,
-                success_rate,
-                collision_rate,
-                avg_nav_time,
-                average(cumulative_rewards),
-                average(average_returns),
+        if k != 1:
+            logging.info(
+                "{:<5} {}has success rate: {:.2f}, collision rate: {:.2f}, nav time: {:.2f}, total reward: {:.4f},"
+                " average return: {:.4f}{}".format(
+                    phase.upper(),
+                    extra_info,
+                    success_rate,
+                    collision_rate,
+                    avg_nav_time,
+                    average(cumulative_rewards),
+                    average(average_returns),
+                    k,
+                )
             )
-        )
         if phase in ["val", "test"]:
             num_step = (
                 sum(success_times + collision_times + timeout_times)
