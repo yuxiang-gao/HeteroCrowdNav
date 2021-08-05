@@ -56,25 +56,14 @@ class CADRL(Policy):
 
     def configure(self, config):
         self.set_common_parameters(config)
-        mlp_dims = [int(x) for x in config.get("cadrl", "mlp_dims").split(", ")]
-        self.model = ValueNetwork(self.joint_state_dim, mlp_dims)
-        self.multiagent_training = config.getboolean(
-            "cadrl", "multiagent_training"
-        )
+        self.__dict__.update(config["cadrl"])
+        self.model = ValueNetwork(self.joint_state_dim, self.mlp_dims)
         logging.info("Policy: CADRL without occupancy map")
 
     def set_common_parameters(self, config):
-        self.gamma = config.getfloat("rl", "gamma")
-        self.kinematics = config.get("action_space", "kinematics")
-        self.sampling = config.get("action_space", "sampling")
-        self.speed_samples = config.getint("action_space", "speed_samples")
-        self.rotation_samples = config.getint(
-            "action_space", "rotation_samples"
-        )
-        self.query_env = config.getboolean("action_space", "query_env")
-        self.cell_num = config.getint("om", "cell_num")
-        self.cell_size = config.getfloat("om", "cell_size")
-        self.om_channel_size = config.getint("om", "om_channel_size")
+        self.__dict__.update(config["rl"])
+        self.__dict__.update(config["action_space"])
+        self.__dict__.update(config["om"])
 
     def set_device(self, device):
         self.device = device

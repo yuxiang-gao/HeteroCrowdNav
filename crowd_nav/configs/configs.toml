@@ -1,5 +1,19 @@
 title = "Config file"
 
+[debug]
+    [debug.env]
+    val_size = 1
+    test_size = 1
+
+    [debug.train]
+    train_episodes = 1
+    checkpoint_interval = 1
+    evaluation_interval = 1
+    target_update_interval = 1
+
+    imitation_learning.il_episodes = 100
+    imitation_learning.il_epochs = 5
+    
 [env]
 time_limit = 25
 time_step = 0.25
@@ -21,22 +35,22 @@ randomize_attributes = false
     circle_radius = 4
     human_num = 5
 
-[agents]
+    [env.agents]
 
-    [agents.humans]
-    visible = true
-    policy = "orca"
-    radius = 0.3
-    v_pref = 1
-    sensor = "coordinates"
+        [env.agents.humans]
+        visible = true
+        policy = "orca"
+        radius = 0.3
+        v_pref = 1
+        sensor = "coordinates"
 
 
-    [agents.robot]
-    visible = false
-    policy = ""
-    radius = 0.3
-    v_pref = 1
-    sensor = "coordinates"
+        [env.agents.robot]
+        visible = false
+        policy = "none"
+        radius = 0.3
+        v_pref = 1
+        sensor = "coordinates"
 
 
 [train]
@@ -58,6 +72,7 @@ checkpoint_interval = 1000
 
     [train.trainer]
     batch_size = 100
+    optimizer = "Adam"
 
     [train.imitation_learning]
     il_episodes = 3000

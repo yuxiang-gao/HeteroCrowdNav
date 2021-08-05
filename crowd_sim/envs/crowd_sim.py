@@ -34,6 +34,7 @@ class CrowdSim(gym.Env):
         self.discomfort_penalty_factor = None
         # simulation configuration
         self.config = None
+        self.agent_config = None
         self.case_capacity = None
         self.case_size = None
         self.case_counter = None
@@ -50,18 +51,20 @@ class CrowdSim(gym.Env):
 
     def configure(self, config):
         self.config = config
-        self.time_limit = config.getint("env", "time_limit")
-        self.time_step = config.getfloat("env", "time_step")
-        self.randomize_attributes = config.getboolean(
-            "env", "randomize_attributes"
-        )
-        self.success_reward = config.getfloat("reward", "success_reward")
-        self.collision_penalty = config.getfloat("reward", "collision_penalty")
-        self.discomfort_dist = config.getfloat("reward", "discomfort_dist")
-        self.discomfort_penalty_factor = config.getfloat(
-            "reward", "discomfort_penalty_factor"
-        )
-        if self.config.get("humans", "policy") == "orca":
+        self.agent_config = config["agents"]
+
+        self.time_limit = config.get("time_limit")
+        self.time_step = config.get("time_step")
+        self.randomize_attributes = config.get("randomize_attributes")
+
+        self.__dict__.update(config["reward"])
+        # self.success_reward = config.getfloat("reward", "success_reward")
+        # self.collision_penalty = config.getfloat("reward", "collision_penalty")
+        # self.discomfort_dist = config.getfloat("reward", "discomfort_dist")
+        # self.discomfort_penalty_factor = config.getfloat(
+        #     "reward", "discomfort_penalty_factor"
+        # )
+        if self.agent_config["humans"]["policy"] == "orca":
             self.case_capacity = {
                 "train": np.iinfo(np.uint32).max - 2000,
                 "val": 1000,
@@ -69,14 +72,15 @@ class CrowdSim(gym.Env):
             }
             self.case_size = {
                 "train": np.iinfo(np.uint32).max - 2000,
-                "val": config.getint("env", "val_size"),
-                "test": config.getint("env", "test_size"),
+                "val": config.get("val_size"),
+                "test": config.get("test_size"),
             }
-            self.train_val_sim = config.get("sim", "train_val_sim")
-            self.test_sim = config.get("sim", "test_sim")
-            self.square_width = config.getfloat("sim", "square_width")
-            self.circle_radius = config.getfloat("sim", "circle_radius")
-            self.human_num = config.getint("sim", "human_num")
+            self.__dict__.update(config["sim"])
+            # self.train_val_sim = config.get("sim", "train_val_sim")
+            # self.test_sim = config.get("sim", "test_sim")
+            # self.square_width = config.getfloat("sim", "square_width")
+            # self.circle_radius = config.getfloat("sim", "circle_radius")
+            # self.human_num = config.getint("sim", "human_num")
         else:
             raise NotImplementedError
         self.case_counter = {"train": 0, "test": 0, "val": 0}
@@ -149,11 +153,11 @@ class CrowdSim(gym.Env):
                 width = 4
                 height = 8
                 if human_num == 0:
-                    human = Human(self.config, "humans")
+                    human = Human(self.agent_config, "humans")
                     human.set(0, -10, 0, -10, 0, 0, 0)
                     self.humans.append(human)
                 for i in range(human_num):
-                    human = Human(self.config, "humans")
+                    human = Human(self.agent_config, "humans")
                     if np.random.random() > 0.5:
                         sign = -1
                     else:
@@ -188,7 +192,7 @@ class CrowdSim(gym.Env):
             raise ValueError("Rule doesn't exist")
 
     def generate_circle_crossing_human(self):
-        human = Human(self.config, "humans")
+        human = Human(self.agent_config, "humans")
         if self.randomize_attributes:
             human.sample_random_attributes()
         while True:
@@ -213,7 +217,7 @@ class CrowdSim(gym.Env):
         return human
 
     def generate_square_crossing_human(self):
-        human = Human(self.config, "humans")
+        human = Human(self.agent_config, "humans")
         if self.randomize_attributes:
             human.sample_random_attributes()
         if np.random.random() > 0.5:
@@ -329,7 +333,7 @@ class CrowdSim(gym.Env):
         if not self.robot.policy.multiagent_training:
             self.train_val_sim = "circle_crossing"
 
-        if self.config.get("humans", "policy") == "trajnet":
+        if self.agent_config["humans"]["policy"] == "trajnet":
             raise NotImplementedError
         else:
             counter_offset = {
@@ -365,7 +369,7 @@ class CrowdSim(gym.Env):
                     # for debugging purposes
                     self.human_num = 3
                     self.humans = [
-                        Human(self.config, "humans")
+                        Human(self.agent_config, "humans")
                         for _ in range(self.human_num)
                     ]
                     self.humans[0].set(0, -6, 0, 5, 0, 0, np.pi / 2)

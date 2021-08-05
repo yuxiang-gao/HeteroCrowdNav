@@ -127,7 +127,7 @@ class Explorer(object):
 
             if pbar:
                 pbar.update(1)
-                pbar.set_description(f"{phase.upper()}")
+                pbar.set_description(f"Explore [{phase.upper()}]")
                 pbar.set_postfix(
                     reward=cumulative_rewards[-1],
                     avg_return=average_returns[-1],
@@ -142,17 +142,24 @@ class Explorer(object):
             else self.env.time_limit
         )
 
-        # extra_info = "" if episode is None else "in episode {} ".format(episode)
-        # logging.info(
-        #     "{:<5} {}has success rate: {:.2f}, collision rate: {:.2f}, nav time: {:.2f}, total reward: {:.4f}".format(
-        #         phase.upper(),
-        #         extra_info,
-        #         success_rate,
-        #         collision_rate,
-        #         avg_nav_time,
-        #         average(cumulative_rewards),
-        #     )
-        # )
+        extra_info = "" if episode is None else "in episode {} ".format(episode)
+        extra_info = (
+            extra_info + ""
+            if epoch is None
+            else extra_info + " in epoch {} ".format(epoch)
+        )
+        logging.info(
+            "{:<5} {}has success rate: {:.2f}, collision rate: {:.2f}, nav time: {:.2f}, total reward: {:.4f},"
+            " average return: {:.4f}".format(
+                phase.upper(),
+                extra_info,
+                success_rate,
+                collision_rate,
+                avg_nav_time,
+                average(cumulative_rewards),
+                average(average_returns),
+            )
+        )
         if phase in ["val", "test"]:
             num_step = (
                 sum(success_times + collision_times + timeout_times)
@@ -187,7 +194,7 @@ class Explorer(object):
         if self.memory is None or self.gamma is None:
             raise ValueError("Memory or gamma value is not set!")
 
-        for i, state in enumerate(states):
+        for i, state in enumerate(states[:-1]):
             reward = rewards[i]
 
             # VALUE UPDATE
@@ -195,6 +202,7 @@ class Explorer(object):
                 # define the value of states in IL as cumulative discounted rewards, which is the same in RL
                 state = self.target_policy.transform(state)
                 # value = pow(self.gamma, (len(states) - 1 - i) * self.robot.time_step * self.robot.v_pref)
+                next_state = self.target_policy.transform(states[i + 1])
                 value = sum(
                     [
                         pow(
@@ -214,14 +222,19 @@ class Explorer(object):
                     # terminal state
                     value = reward
                 else:
-                    gamma_bar = pow(
-                        self.gamma, self.robot.time_step * self.robot.v_pref
-                    )
-                    value = (
-                        reward
-                        + gamma_bar
-                        * self.target_model(next_state.unsqueeze(0)).data.item()
-                    )
+                    value = 0
+                # if i == len(states) - 1:
+                #     # terminal state
+                #     value = reward
+                # else:
+                #     gamma_bar = pow(
+                #         self.gamma, self.robot.time_step * self.robot.v_pref
+                #     )
+                #     value = (
+                #         reward
+                #         + gamma_bar
+                #         * self.target_model(next_state.unsqueeze(0)).data.item()
+                #     )
             value = torch.Tensor([value]).to(self.device)
             reward = torch.Tensor([rewards[i]]).to(self.device)
 

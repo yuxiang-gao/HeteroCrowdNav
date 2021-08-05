@@ -13,11 +13,13 @@ class Agent(object):
         Base class for robot and human. Have the physical attributes of an agent.
 
         """
-        self.visible = config.getboolean(section, "visible")
-        self.v_pref = config.getfloat(section, "v_pref")
-        self.radius = config.getfloat(section, "radius")
-        self.policy = policy_factory[config.get(section, "policy")]()
-        self.sensor = config.get(section, "sensor")
+        config = config.get(section)
+        self.__dict__.update(config)
+        # self.visible = config.getboolean(section, "visible")
+        # self.v_pref = config.getfloat(section, "v_pref")
+        # self.radius = config.getfloat(section, "radius")
+        self.policy = policy_factory[config.get("policy")]()
+        # self.sensor = config.get(section, "sensor")
         self.kinematics = (
             self.policy.kinematics if self.policy is not None else None
         )
