@@ -7,7 +7,14 @@ from crowd_sim.envs.utils.info import *
 
 class Explorer(object):
     def __init__(
-        self, env, robot, device, memory=None, gamma=None, target_policy=None
+        self,
+        env,
+        robot,
+        device,
+        memory=None,
+        gamma=None,
+        target_policy=None,
+        writer=None,
     ):
         self.env = env
         self.robot = robot
@@ -16,6 +23,8 @@ class Explorer(object):
         self.gamma = gamma
         self.target_policy = target_policy
         self.target_model = None
+        self.writer = writer
+        self.statistics = None
 
     def update_target_model(self, target_model):
         self.target_model = copy.deepcopy(target_model)
@@ -28,6 +37,7 @@ class Explorer(object):
         update_memory=False,
         imitation_learning=False,
         episode=None,
+        epoch=None,
         print_failure=False,
     ):
         self.robot.policy.set_phase(phase)
@@ -37,9 +47,10 @@ class Explorer(object):
         success = 0
         collision = 0
         timeout = 0
-        too_close = 0
+        discomfort = 0
         min_dist = []
         cumulative_rewards = []
+        average_returns = []
         collision_cases = []
         timeout_cases = []
 
@@ -61,8 +72,8 @@ class Explorer(object):
                 actions.append(action)
                 rewards.append(reward)
 
-                if isinstance(info, Danger):
-                    too_close += 1
+                if isinstance(info, Discomfort):
+                    discomfort += 1
                     min_dist.append(info.min_dist)
 
             if isinstance(info, ReachGoal):
@@ -99,8 +110,28 @@ class Explorer(object):
                 )
             )
 
+            returns = []
+            for step in range(len(rewards)):
+                step_return = sum(
+                    [
+                        pow(
+                            self.gamma,
+                            t * self.robot.time_step * self.robot.v_pref,
+                        )
+                        * reward
+                        for t, reward in enumerate(rewards[step:])
+                    ]
+                )
+                returns.append(step_return)
+            average_returns.append(average(returns))
+
             if pbar:
                 pbar.update(1)
+                pbar.set_description(f"{phase.upper()}")
+                pbar.set_postfix(
+                    reward=cumulative_rewards[-1],
+                    avg_return=average_returns[-1],
+                )
 
         success_rate = success / k
         collision_rate = collision / k
@@ -111,17 +142,17 @@ class Explorer(object):
             else self.env.time_limit
         )
 
-        extra_info = "" if episode is None else "in episode {} ".format(episode)
-        logging.info(
-            "{:<5} {}has success rate: {:.2f}, collision rate: {:.2f}, nav time: {:.2f}, total reward: {:.4f}".format(
-                phase.upper(),
-                extra_info,
-                success_rate,
-                collision_rate,
-                avg_nav_time,
-                average(cumulative_rewards),
-            )
-        )
+        # extra_info = "" if episode is None else "in episode {} ".format(episode)
+        # logging.info(
+        #     "{:<5} {}has success rate: {:.2f}, collision rate: {:.2f}, nav time: {:.2f}, total reward: {:.4f}".format(
+        #         phase.upper(),
+        #         extra_info,
+        #         success_rate,
+        #         collision_rate,
+        #         avg_nav_time,
+        #         average(cumulative_rewards),
+        #     )
+        # )
         if phase in ["val", "test"]:
             num_step = (
                 sum(success_times + collision_times + timeout_times)
@@ -129,7 +160,7 @@ class Explorer(object):
             )
             logging.info(
                 "Frequency of being in danger: %.2f and average min separate distance in danger: %.2f",
-                too_close / num_step,
+                discomfort / num_step,
                 average(min_dist),
             )
 
@@ -141,6 +172,16 @@ class Explorer(object):
             logging.info(
                 "Timeout cases: " + " ".join([str(x) for x in timeout_cases])
             )
+
+        self.statistics = (
+            success_rate,
+            collision_rate,
+            avg_nav_time,
+            average(cumulative_rewards),
+            average(average_returns),
+        )
+
+        return self.statistics
 
     def update_memory(self, states, actions, rewards, imitation_learning=False):
         if self.memory is None or self.gamma is None:
@@ -168,11 +209,11 @@ class Explorer(object):
                     ]
                 )
             else:
+                next_state = states[i + 1]
                 if i == len(states) - 1:
                     # terminal state
                     value = reward
                 else:
-                    next_state = states[i + 1]
                     gamma_bar = pow(
                         self.gamma, self.robot.time_step * self.robot.v_pref
                     )
@@ -182,6 +223,7 @@ class Explorer(object):
                         * self.target_model(next_state.unsqueeze(0)).data.item()
                     )
             value = torch.Tensor([value]).to(self.device)
+            reward = torch.Tensor([rewards[i]]).to(self.device)
 
             # # transform state of different human_num into fixed-size tensor
             # if len(state.size()) == 1:
@@ -192,7 +234,17 @@ class Explorer(object):
             # if human_num != 5:
             #     padding = torch.zeros((5 - human_num, feature_size))
             #     state = torch.cat([state, padding])
-            self.memory.push((state, value))
+            self.memory.push((state, value, reward, next_state))
+
+    def log(self, tag_prefix, global_step):
+        sr, cr, time, reward, avg_return = self.statistics
+        self.writer.add_scalar(tag_prefix + "/success_rate", sr, global_step)
+        self.writer.add_scalar(tag_prefix + "/collision_rate", cr, global_step)
+        self.writer.add_scalar(tag_prefix + "/time", time, global_step)
+        self.writer.add_scalar(tag_prefix + "/reward", reward, global_step)
+        self.writer.add_scalar(
+            tag_prefix + "/avg_return", avg_return, global_step
+        )
 
 
 def average(input_list):
