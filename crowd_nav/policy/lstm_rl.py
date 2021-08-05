@@ -76,18 +76,13 @@ class LstmRL(MultiHumanRL):
 
     def configure(self, config):
         self.set_common_parameters(config)
-        mlp_dims = [
-            int(x) for x in config.get("lstm_rl", "mlp2_dims").split(", ")
-        ]
-        global_state_dim = config.getint("lstm_rl", "global_state_dim")
-        self.with_om = config.getboolean("lstm_rl", "with_om")
-        with_interaction_module = config.getboolean(
-            "lstm_rl", "with_interaction_module"
-        )
+        lstm_config = config["lstm_rl"]
+        mlp_dims = lstm_config["mlp2_dims"]
+        global_state_dim = lstm_config["global_state_dim"]
+        self.with_om = lstm_config["with_om"]
+        with_interaction_module = lstm_config["with_interaction_module"]
         if with_interaction_module:
-            mlp1_dims = [
-                int(x) for x in config.get("lstm_rl", "mlp1_dims").split(", ")
-            ]
+            mlp1_dims = lstm_config["mlp1_dims"]
             self.model = ValueNetwork2(
                 self.input_dim(),
                 self.self_state_dim,
@@ -102,9 +97,7 @@ class LstmRL(MultiHumanRL):
                 mlp_dims,
                 global_state_dim,
             )
-        self.multiagent_training = config.getboolean(
-            "lstm_rl", "multiagent_training"
-        )
+        self.multiagent_training = lstm_config["multiagent_training"]
         logging.info(
             "Policy: {}LSTM-RL {} pairwise interaction module".format(
                 "OM-" if self.with_om else "",
