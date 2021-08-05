@@ -220,6 +220,19 @@ def main():
         logging.info("Experience set size: %d/%d", len(memory), memory.capacity)
     trainer.update_target_model(model)
 
+    # eval
+    logging.info(
+        "Evaluate the model instantly after imitation learning on the validation cases"
+    )
+    explorer.run_k_episodes(env.case_size["val"], "val", episode=0)
+    explorer.log("val", 0)
+
+    if args.test_after_every_eval:
+        explorer.run_k_episodes(
+            env.case_size["test"], "test", episode=0, print_failure=True
+        )
+        explorer.log("test", 0)
+
     # reinforcement learning
     logging.info("-" * 80)
     logging.info("Start reinforcement learning...")
@@ -235,6 +248,7 @@ def main():
     episode = 0
     best_val_reward = -1
     best_val_model = None
+
     for episode in tqdm(range(train_episodes), desc="RL", colour="blue"):
         if args.resume:
             epsilon = epsilon_end

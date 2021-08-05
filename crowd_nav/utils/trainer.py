@@ -109,6 +109,9 @@ class VNRLTrainer(Trainer):
                 pbar.set_postfix(loss=loss.data.item())
 
             average_epoch_loss = epoch_loss / len(self.memory)
+            self.writer.add_scalar(
+                "IL/average_epoch_loss", average_epoch_loss, epoch
+            )
             loop.set_postfix(loss=average_epoch_loss)
             logging.debug(
                 "Average loss in epoch %d: %.2E", epoch, average_epoch_loss
@@ -124,7 +127,9 @@ class VNRLTrainer(Trainer):
                 self.memory, self.batch_size, shuffle=True
             )
         losses = 0
-        pbar = tqdm(self.data_loader, total=num_batches, colour="green")
+        pbar = tqdm(
+            self.data_loader, total=num_batches, leave=False, colour="green"
+        )
         # batch_count = 0
         for batch_count, (inputs, values, rewards, next_states) in enumerate(
             pbar
@@ -150,6 +155,7 @@ class VNRLTrainer(Trainer):
                 break
 
         average_loss = losses / num_batches
+        self.writer.add_scalar("RL/average_loss", average_loss, episode)
         logging.debug("Average loss : %.2E", average_loss)
 
         return average_loss
