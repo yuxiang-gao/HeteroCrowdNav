@@ -69,6 +69,10 @@ def main():
     set_random_seeds(args.randomseed)
 
     # configure paths
+    if args.debug:  # overwrite debug output by default
+        if args.tag is None:
+            args.tag = "debug"
+            args.overwrite = True
     policy_path = (
         args.policy if args.tag is None else args.policy + "_" + args.tag
     )

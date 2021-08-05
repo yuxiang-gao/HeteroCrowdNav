@@ -40,7 +40,7 @@ class CrowdSim(gym.Env):
         self.case_counter = None
         self.randomize_attributes = None
         self.train_val_sim = None
-        self.test_sim = None
+        self.test_scenario = None
         self.square_width = None
         self.circle_radius = None
         self.human_num = None
@@ -77,7 +77,7 @@ class CrowdSim(gym.Env):
             }
             self.__dict__.update(config["sim"])
             # self.train_val_sim = config.get("sim", "train_val_sim")
-            # self.test_sim = config.get("sim", "test_sim")
+            # self.test_scenario = config.get("sim", "test_scenario")
             # self.square_width = config.getfloat("sim", "square_width")
             # self.circle_radius = config.getfloat("sim", "circle_radius")
             # self.human_num = config.getint("sim", "human_num")
@@ -92,7 +92,7 @@ class CrowdSim(gym.Env):
             logging.info("Not randomize human's radius and preferred speed")
         logging.info(
             "Training simulation: {}, test simulation: {}".format(
-                self.train_val_sim, self.test_sim
+                self.train_val_sim, self.test_scenario
             )
         )
         logging.info(
@@ -357,7 +357,7 @@ class CrowdSim(gym.Env):
                     )
                 else:
                     self.generate_random_human_position(
-                        human_num=self.human_num, rule=self.test_sim
+                        human_num=self.human_num, rule=self.test_scenario
                     )
                 # case_counter is always between 0 and case_size[phase]
                 self.case_counter[phase] = (
