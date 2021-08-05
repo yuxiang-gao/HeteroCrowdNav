@@ -484,7 +484,7 @@ class CrowdSim(gym.Env):
                 * self.time_step
             )
             done = False
-            info = Danger(dmin)
+            info = Discomfort(dmin)
         else:
             reward = 0
             done = False
