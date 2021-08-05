@@ -10,6 +10,7 @@ import torch
 import toml
 import gym
 import git
+from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
 from crowd_sim.envs.utils.robot import Robot
@@ -234,7 +235,7 @@ def main():
     episode = 0
     best_val_reward = -1
     best_val_model = None
-    while episode < train_episodes:
+    for episode in tqdm(range(train_episodes), desc="RL", colour="blue"):
         if args.resume:
             epsilon = epsilon_end
         else:
@@ -254,7 +255,6 @@ def main():
         explorer.log("train", episode)
 
         trainer.optimize_batch(train_batches, episode)
-        episode += 1
 
         if episode % target_update_interval == 0:
             explorer.update_target_model(model)

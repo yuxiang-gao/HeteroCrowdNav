@@ -55,7 +55,7 @@ class Explorer(object):
         timeout_cases = []
 
         if k != 1:
-            pbar = tqdm(total=k)
+            pbar = tqdm(total=k, desc=f"Explore [{phase.upper()}]", leave=False)
         else:
             pbar = None
 
@@ -127,7 +127,6 @@ class Explorer(object):
 
             if pbar:
                 pbar.update(1)
-                pbar.set_description(f"Explore [{phase.upper()}]")
                 pbar.set_postfix(
                     reward=cumulative_rewards[-1],
                     avg_return=average_returns[-1],

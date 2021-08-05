@@ -86,10 +86,16 @@ class VNRLTrainer(Trainer):
                 self.memory, self.batch_size, shuffle=True
             )
         average_epoch_loss = 0
-        for epoch in range(num_epochs):
+        loop = tqdm(range(num_epochs), desc="Imitate", colour="blue")
+        for epoch in loop:
             epoch_loss = 0
-            pbar = tqdm(self.data_loader)
-            for _, (inputs, values, _, _) in enumerate(pbar):
+            pbar = tqdm(
+                self.data_loader,
+                desc=f"Epoch [{epoch}/{num_epochs}]",
+                colour="green",
+                leave=False,
+            )
+            for inputs, values, _, _ in pbar:
                 inputs = Variable(inputs)
                 values = Variable(values)
 
@@ -99,10 +105,11 @@ class VNRLTrainer(Trainer):
                 loss.backward()
                 self.optimizer.step()
                 epoch_loss += loss.data.item()
-                pbar.set_description(f"Epoch [{epoch}/{num_epochs}]")
+                # pbar.set_description(f"Epoch [{epoch}/{num_epochs}]")
                 pbar.set_postfix(loss=loss.data.item())
 
             average_epoch_loss = epoch_loss / len(self.memory)
+            loop.set_postfix(loss=average_epoch_loss)
             logging.debug(
                 "Average loss in epoch %d: %.2E", epoch, average_epoch_loss
             )
@@ -117,7 +124,7 @@ class VNRLTrainer(Trainer):
                 self.memory, self.batch_size, shuffle=True
             )
         losses = 0
-        pbar = tqdm(self.data_loader, total=num_batches)
+        pbar = tqdm(self.data_loader, total=num_batches, colour="green")
         # batch_count = 0
         for batch_count, (inputs, values, rewards, next_states) in enumerate(
             pbar
