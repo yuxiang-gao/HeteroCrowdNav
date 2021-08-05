@@ -93,20 +93,14 @@ class SARL(MultiHumanRL):
 
     def configure(self, config):
         self.set_common_parameters(config)
-        mlp1_dims = [
-            int(x) for x in config.get("sarl", "mlp1_dims").split(", ")
-        ]
-        mlp2_dims = [
-            int(x) for x in config.get("sarl", "mlp2_dims").split(", ")
-        ]
-        mlp3_dims = [
-            int(x) for x in config.get("sarl", "mlp3_dims").split(", ")
-        ]
-        attention_dims = [
-            int(x) for x in config.get("sarl", "attention_dims").split(", ")
-        ]
-        self.with_om = config.getboolean("sarl", "with_om")
-        with_global_state = config.getboolean("sarl", "with_global_state")
+        sarl_config = config["sarl"]
+        mlp1_dims = sarl_config["mlp1_dims"]
+        mlp2_dims = sarl_config["mlp2_dims"]
+        attention_dims = sarl_config["attention_dims"]
+        mlp3_dims = sarl_config["mlp2_dims"]
+
+        self.with_om = sarl_config["with_om"]
+        with_global_state = sarl_config["with_global_state"]
         self.model = ValueNetwork(
             self.input_dim(),
             self.self_state_dim,
@@ -118,9 +112,7 @@ class SARL(MultiHumanRL):
             self.cell_size,
             self.cell_num,
         )
-        self.multiagent_training = config.getboolean(
-            "sarl", "multiagent_training"
-        )
+        self.multiagent_training = sarl_config["multiagent_training"]
         if self.with_om:
             self.name = "OM-SARL"
         logging.info(

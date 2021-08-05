@@ -52,6 +52,7 @@ def set_random_seeds(seed):
 def main():
     parser = argparse.ArgumentParser("Parse configuration file")
     parser.add_argument("--policy", type=str, default="cadrl")
+    parser.add_argument("--tag", type=str)
     parser.add_argument("--config", type=str, default="configs/configs.toml")
     parser.add_argument("--output_dir", type=str, default="data/output")
     parser.add_argument("--overwrite", default=False, action="store_true")
@@ -68,8 +69,11 @@ def main():
     set_random_seeds(args.randomseed)
 
     # configure paths
+    policy_path = (
+        args.policy if args.tag is None else args.policy + "_" + args.tag
+    )
     output_dir = Path(
-        args.output_dir, args.policy
+        args.output_dir, policy_path
     )  # make a new output dir for each policy
     config_dir = Path(args.config)
     config_output = Path(
