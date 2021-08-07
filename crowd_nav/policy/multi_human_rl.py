@@ -29,7 +29,11 @@ class MultiHumanRL(CADRL):
             )
         if self.action_space is None:
             self.build_action_space(state.self_state.v_pref)
-
+        if not state.human_states:
+            assert self.phase != "train"
+            if hasattr(self, "attention_weights"):
+                self.attention_weights = list()
+            return self.select_greedy_action(state.self_state)
         occupancy_maps = None
         probability = np.random.random()
         if self.phase == "train" and probability < self.epsilon:
@@ -92,6 +96,8 @@ class MultiHumanRL(CADRL):
                 if value > max_value:
                     max_value = value
                     max_action = action
+                    if hasattr(self, "attention_weights"):
+                        self.attention_weights = self.model.attention_weights
             if max_action is None:
                 raise ValueError("Value network is not well trained. ")
 
@@ -145,15 +151,14 @@ class MultiHumanRL(CADRL):
             ],
             dim=0,
         )
+        rotated_state_tensor = self.rotate(state_tensor)
         if self.with_om:
             occupancy_maps = self.build_occupancy_maps(state.human_states)
-            state_tensor = torch.cat(
-                [self.rotate(state_tensor), occupancy_maps.to(self.device)],
-                dim=1,
+            rotated_state_tensor = torch.cat(
+                [rotated_state_tensor, occupancy_maps.to(self.device)], dim=1
             )
-        else:
-            state_tensor = self.rotate(state_tensor)
-        return state_tensor
+
+        return rotated_state_tensor
 
     def input_dim(self):
         return self.joint_state_dim + (

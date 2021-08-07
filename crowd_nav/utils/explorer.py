@@ -1,7 +1,8 @@
-import logging
 import copy
+import logging
 import torch
 from tqdm import tqdm
+
 from crowd_sim.envs.utils.info import *
 
 
