@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn.functional import softmax
+import torch.nn.utils.rnn as rnn_utils
 import logging
 from crowd_nav.policy.cadrl import mlp
 from crowd_nav.policy.multi_human_rl import MultiHumanRL
@@ -35,13 +36,19 @@ class ValueNetwork(nn.Module):
         self.mlp3 = mlp(mlp3_input_dim, mlp3_dims)
         self.attention_weights = None
 
-    def forward(self, state):
+    def forward(self, state_input):
         """
         First transform the world coordinates to self-centric coordinates and then do forward computation
 
         :param state: tensor of shape (batch_size, # of humans, length of a rotated state)
         :return:
         """
+        if isinstance(state_input, tuple):
+            state, lengths = state_input
+        else:
+            state = state_input
+            lengths = torch.IntTensor([state.size()[1]])
+
         size = state.shape
         self_state = state[:, 0, : self.self_state_dim]
         mlp1_output = self.mlp1(state.view((-1, size[2])))
@@ -72,6 +79,15 @@ class ValueNetwork(nn.Module):
         weights = (
             scores_exp / torch.sum(scores_exp, dim=1, keepdim=True)
         ).unsqueeze(2)
+        # mask = rnn_utils.pad_sequence(
+        #     [torch.ones(length.item()) for length in lengths], batch_first=True
+        # )
+        # masked_scores = scores * mask.float()
+        # max_scores = torch.max(masked_scores, dim=1, keepdim=True)[0]
+        # exps = torch.exp(masked_scores - max_scores)
+        # masked_exps = exps * mask.float()
+        # masked_sums = masked_exps.sum(1, keepdim=True)
+        # weights = (masked_exps / masked_sums).unsqueeze(2)
         self.attention_weights = weights[0, :, 0].data.cpu().numpy()
 
         # output feature is a linear combination of input features
@@ -90,6 +106,7 @@ class SARL(MultiHumanRL):
     def __init__(self):
         super().__init__()
         self.name = "SARL"
+        self.attention_weights = None
 
     def configure(self, config):
         self.set_common_parameters(config)
@@ -97,9 +114,10 @@ class SARL(MultiHumanRL):
         mlp1_dims = sarl_config["mlp1_dims"]
         mlp2_dims = sarl_config["mlp2_dims"]
         attention_dims = sarl_config["attention_dims"]
-        mlp3_dims = sarl_config["mlp2_dims"]
+        mlp3_dims = sarl_config["mlp3_dims"]
 
         self.with_om = sarl_config["with_om"]
+        self.multiagent_training = sarl_config["multiagent_training"]
         with_global_state = sarl_config["with_global_state"]
         self.model = ValueNetwork(
             self.input_dim(),
@@ -112,7 +130,6 @@ class SARL(MultiHumanRL):
             self.cell_size,
             self.cell_num,
         )
-        self.multiagent_training = sarl_config["multiagent_training"]
         if self.with_om:
             self.name = "OM-SARL"
         logging.info(
