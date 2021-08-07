@@ -9,6 +9,7 @@ import torch
 import gym
 import git
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 from tensorboardX import SummaryWriter
 
 from crowd_sim.envs.utils.config import Config
@@ -252,12 +253,13 @@ def main():
         robot.policy.set_epsilon(epsilon)
 
         # sample k episodes into memory and optimize over the generated memory
-        explorer.run_k_episodes(
-            sample_episodes, "train", update_memory=True, episode=episode
-        )
-        explorer.log("train", episode)
+        with logging_redirect_tqdm():
+            explorer.run_k_episodes(
+                sample_episodes, "train", update_memory=True, episode=episode
+            )
+            explorer.log("train", episode)
 
-        trainer.optimize_batch(train_batches, episode)
+            trainer.optimize_batch(train_batches, episode)
 
         if episode % target_update_interval == 0:
             explorer.update_target_model(model)

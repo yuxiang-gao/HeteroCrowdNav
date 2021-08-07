@@ -157,3 +157,13 @@ checkpoint_interval = 1000
     multiagent_training = true
     with_om = false
     with_global_state = true
+
+    [policy.harl] 
+    # action space size is speed_samples * rotation_samples + 1
+    mlp1_dims = [150, 100]
+    mlp2_dims = [100, 50]
+    attention_dims = [100, 100, 1]
+    mlp3_dims = [150, 100, 100, 1]
+    multiagent_training = true
+    with_om = false
+    with_global_state = true
