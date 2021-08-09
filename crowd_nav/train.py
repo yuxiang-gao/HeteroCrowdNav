@@ -2,42 +2,21 @@ import sys
 import shutil
 import logging
 import argparse
-import collections
 from pathlib import Path
 from copy import deepcopy
 
 import torch
-import toml
 import gym
 import git
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
+from crowd_sim.envs.utils.config import Config
 from crowd_sim.envs.utils.robot import Robot
 from crowd_nav.utils.trainer import VNRLTrainer
 from crowd_nav.utils.memory import ReplayMemory
 from crowd_nav.utils.explorer import Explorer
 from crowd_nav.policy.policy_factory import policy_factory
-
-
-def dict_merge(dct, merge_dct):
-    """Recursive dict merge. Inspired by :meth:``dict.update()``, instead of
-    updating only top-level keys, dict_merge recurses down into dicts nested
-    to an arbitrary depth, updating keys. The ``merge_dct`` is merged into
-    ``dct``.
-    :param dct: dict onto which the merge is executed
-    :param merge_dct: dct merged into dct
-    :return: None
-    """
-    for k, v in merge_dct.items():
-        if (
-            k in dct
-            and isinstance(dct[k], dict)
-            and isinstance(merge_dct[k], collections.Mapping)
-        ):
-            dict_merge(dct[k], merge_dct[k])
-        else:
-            dct[k] = merge_dct[k]
 
 
 def set_random_seeds(seed):
@@ -85,7 +64,7 @@ def main():
     )  # location to store config in output dir
     if args.resume:
         if config_output.exists():
-            config = toml.load(config_output)
+            config = Config(config_output)
         else:
             parser.error("Nothing to resume.")
     else:
@@ -99,14 +78,13 @@ def main():
                 if key == "y":
                     shutil.rmtree(output_dir)
         Path(output_dir).mkdir(exist_ok=True)  # make new dir
-        config = toml.load(config_dir)
+        config = Config(config_dir)
 
         # store current config to output
-        with open(config_output, "w") as f:
-            toml.dump(config, f)
+        config.dump(config_output)
 
     if args.debug:
-        dict_merge(config, config["debug"])
+        config.merge(config("debug"))
 
     log_file = Path(output_dir, "output.log")
     il_weight_file = Path(output_dir, "il_model.pth")
@@ -146,12 +124,12 @@ def main():
     # configure environment
     logging.info("Configuring environment...")
     env = gym.make("CrowdSim-v0")
-    env.configure(config["env"])
-    robot = Robot(config["env"]["agents"], "robot")
+    env.configure(config("env"))
+    robot = Robot(config("env", "agents"), "robot")
     env.set_robot(robot)
 
     # read training parameters
-    train_config = config["train"]
+    train_config = config("train")
     rl_learning_rate = train_config.get("rl_learning_rate")
     train_batches = train_config.get("train_batches")
     train_episodes = train_config.get("train_episodes")
@@ -168,14 +146,14 @@ def main():
     logging.info("Configuring trainer and explorer...")
     memory = ReplayMemory(capacity)
     model = policy.get_model()
-    batch_size = train_config["trainer"]["batch_size"]
+    batch_size = train_config("trainer", "batch_size")
     trainer = VNRLTrainer(
         model,
         memory,
         device,
         batch_size,
         writer,
-        train_config["trainer"]["optimizer"],
+        train_config("trainer", "optimizer"),
     )
     explorer = Explorer(
         env,
@@ -202,17 +180,17 @@ def main():
         model.load_state_dict(torch.load(il_weight_file))
         logging.info("Load imitation learning trained weights...")
     else:
-        il_episodes = train_config["imitation_learning"]["il_episodes"]
-        il_policy = train_config["imitation_learning"]["il_policy"]
-        il_epochs = train_config["imitation_learning"]["il_epochs"]
-        il_learning_rate = train_config["imitation_learning"][
-            "il_learning_rate"
-        ]
+        il_episodes = train_config("imitation_learning", "il_episodes")
+        il_policy = train_config("imitation_learning", "il_policy")
+        il_epochs = train_config("imitation_learning", "il_epochs")
+        il_learning_rate = train_config(
+            "imitation_learning", "il_learning_rate"
+        )
         trainer.set_learning_rate(il_learning_rate)
         if robot.visible:
             safety_space = 0
         else:
-            safety_space = train_config["imitation_learning"]["safety_space"]
+            safety_space = train_config("imitation_learning", "safety_space")
         il_policy = policy_factory[il_policy]()
         il_policy.multiagent_training = policy.multiagent_training
         il_policy.safety_space = safety_space
