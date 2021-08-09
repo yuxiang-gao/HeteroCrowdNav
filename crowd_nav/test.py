@@ -16,30 +16,31 @@ from crowd_sim.envs.policy.orca import ORCA
 
 def main():
     parser = argparse.ArgumentParser("Parse configuration file")
-    # parser.add_argument("--env_config", type=str, default="configs/env.config")
-    # parser.add_argument(
-    #     "--policy_config", type=str, default="configs/policy.config"
-    # )
-    parser.add_argument("--config", type=str, default="configs/configs.toml")
+    parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--policy", type=str, default="orca")
-    parser.add_argument("--model_dir", type=str, default=None)
+    parser.add_argument("-m", "--model_dir", type=str, default=None)
     parser.add_argument("--il", default=False, action="store_true")
+    parser.add_argument("--rl", default=False, action="store_true")
     parser.add_argument("--gpu", default=False, action="store_true")
-    parser.add_argument("--visualize", default=False, action="store_true")
+    parser.add_argument("-v", "--visualize", default=False, action="store_true")
     parser.add_argument("--phase", type=str, default="test")
-    parser.add_argument("--test_case", type=int, default=None)
+    parser.add_argument("-c", "--test_case", type=int, default=None)
     parser.add_argument("--square", default=False, action="store_true")
     parser.add_argument("--circle", default=False, action="store_true")
     parser.add_argument("--video_file", type=str, default=None)
+    parser.add_argument("--video_dir", type=str, default=None)
     parser.add_argument("--traj", default=False, action="store_true")
     parser.add_argument("--debug", default=False, action="store_true")
     parser.add_argument("--human_num", type=int, default=None)
     parser.add_argument("--safety_space", type=float, default=0.2)
-    parser.add_argument("--gamma", type=float, default=0.9)
     parser.add_argument("--test_scenario", type=str, default=None)
     parser.add_argument(
         "--plot_test_scenarios_hist", default=True, action="store_true"
     )
+    parser.add_argument("-d", "--planning_depth", type=int, default=None)
+    parser.add_argument("-w", "--planning_width", type=int, default=None)
+    parser.add_argument("--sparse_search", default=False, action="store_true")
+
     args = parser.parse_args()
 
     # configure logging and device
@@ -55,26 +56,45 @@ def main():
     logging.info("Using device: %s", device)
 
     if args.model_dir is not None:
-        config_file = Path(args.model_dir, Path(args.config).name)
+        if args.config is not None:
+            config_file = args.config
+        else:
+            config_file = Path(args.model_dir, "configs.toml")
         if args.il:
             model_weights = Path(args.model_dir, "il_model.pth")
             logging.info("Loaded IL weights")
-        else:
+        elif args.rl:
             if Path(args.model_dir, "resumed_rl_model.pth").exists():
                 model_weights = Path(args.model_dir, "resumed_rl_model.pth")
             else:
-                model_weights = Path(args.model_dir, "rl_model.pth")
-            logging.info("Loaded RL weights")
+                # print(os.listdir(args.model_dir))
+                model_weights = sorted(Path(args.model_dir).glob("*.pth"))[-1]
+
+            logging.info(f"Loaded RL weights at {model_weights}")
+        else:
+            model_weights = Path(args.model_dir, "best_val.pth")
+            logging.info("Loaded RL weights with best VAL")
+
     else:
-        config_file = Path(args.config)
+        config_file = args.config
 
     config = toml.load(config_file)
     policy_config = config["policy"]
     env_config = config["env"]
     agent_config = env_config["agents"]
+    train_config = config["train"]
 
     # configure policy
-    policy = policy_factory[args.policy]()
+    policy = policy_factory[policy_config["name"]]()
+    if args.planning_depth is not None:
+        policy_config.model_predictive_rl.do_action_clip = True
+        policy_config.model_predictive_rl.planning_depth = args.planning_depth
+    if args.planning_width is not None:
+        policy_config.model_predictive_rl.do_action_clip = True
+        policy_config.model_predictive_rl.planning_width = args.planning_width
+    if args.sparse_search:
+        policy_config.model_predictive_rl.sparse_search = True
+
     policy.configure(policy_config)
     if policy.trainable:
         if args.model_dir is None:
@@ -85,7 +105,7 @@ def main():
 
     # configure environment
     if args.human_num is not None:
-        env_config["sim"]["human_num"] = args.human_num
+        env_config.sim.human_num = args.human_num
     env = gym.make("CrowdSim-v0")
     env.configure(env_config)
 
@@ -100,9 +120,9 @@ def main():
     env.set_robot(robot)
     robot.time_step = env.time_step
     robot.set_policy(policy)
-    explorer = Explorer(env, robot, device, gamma=0.9)
+    explorer = Explorer(env, robot, device, None, gamma=0.9)
 
-    epsilon_end = config["train"]["epsilon_end"]
+    epsilon_end = train_config["epsilon_end"]
     if not isinstance(robot.policy, ORCA):
         robot.policy.set_epsilon(epsilon_end)
 
@@ -113,9 +133,7 @@ def main():
         if robot.visible:
             robot.policy.safety_space = args.safety_space
         else:
-            # because invisible case breaks the reciprocal assumption
-            # adding some safety space improves ORCA performance. Tune this value based on your need.
-            robot.policy.safety_space = 0
+            robot.policy.safety_space = args.safety_space
         logging.info("ORCA agent buffer: %f", robot.policy.safety_space)
 
     policy.set_env(env)
@@ -123,23 +141,23 @@ def main():
 
     if args.visualize:
         rewards = []
-        done = False
         ob = env.reset(args.phase, args.test_case)
+        done = False
         last_pos = np.array(robot.get_position())
         while not done:
             action = robot.act(ob)
-            ob, reward, done, info = env.step(action)
-            rewards.append(reward)
+            ob, _, done, info = env.step(action)
+            rewards.append(_)
             current_pos = np.array(robot.get_position())
             logging.debug(
                 "Speed: %.2f",
                 np.linalg.norm(current_pos - last_pos) / robot.time_step,
             )
             last_pos = current_pos
-
+        gamma = 0.9
         cumulative_reward = sum(
             [
-                pow(args.gamma, t * robot.time_step * robot.v_pref) * reward
+                pow(gamma, t * robot.time_step * robot.v_pref) * reward
                 for t, reward in enumerate(rewards)
             ]
         )
@@ -147,8 +165,27 @@ def main():
         if args.traj:
             env.render("traj", args.video_file)
         else:
+            if args.video_dir is not None:
+                if policy_config.name == "gcn":
+                    args.video_file = os.path.join(
+                        args.video_dir,
+                        policy_config.name
+                        + "_"
+                        + policy_config.gcn.similarity_function,
+                    )
+                else:
+                    args.video_file = os.path.join(
+                        args.video_dir, policy_config.name
+                    )
+                args.video_file = (
+                    args.video_file
+                    + "_"
+                    + args.phase
+                    + "_"
+                    + str(args.test_case)
+                    + ".mp4"
+                )
             env.render("video", args.video_file)
-
         logging.info(
             "It takes %.2f seconds to finish. Final status is %s, cumulative_reward is %f",
             env.global_time,
@@ -165,12 +202,11 @@ def main():
         explorer.run_k_episodes(
             env.case_size[args.phase], args.phase, print_failure=True
         )
-
         if args.plot_test_scenarios_hist:
             test_angle_seeds = np.array(env.test_scene_seeds)
             b = [i * 0.01 for i in range(101)]
             n, bins, patches = plt.hist(test_angle_seeds, b, facecolor="g")
-            plt.savefig(Path(args.model_dir, "test_scene_hist.png"))
+            plt.savefig(os.path.join(args.model_dir, "test_scene_hist.png"))
             plt.close()
 
 

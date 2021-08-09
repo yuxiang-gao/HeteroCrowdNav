@@ -100,6 +100,8 @@ def main():
                     shutil.rmtree(output_dir)
         Path(output_dir).mkdir(exist_ok=True)  # make new dir
         config = toml.load(config_dir)
+        config["policy"]["name"] = args.policy
+        config["policy"]["tag"] = args.tag
 
         # store current config to output
         with open(config_output, "w") as f:
