@@ -37,6 +37,9 @@ def main():
     parser.add_argument("--safety_space", type=float, default=0.2)
     parser.add_argument("--gamma", type=float, default=0.9)
     parser.add_argument("--test_scenario", type=str, default=None)
+    parser.add_argument(
+        "--plot_test_scenarios_hist", default=True, action="store_true"
+    )
     args = parser.parse_args()
 
     # configure logging and device

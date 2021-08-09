@@ -148,6 +148,7 @@ def main():
     env = gym.make("CrowdSim-v0")
     env.configure(config["env"])
     robot = Robot(config["env"]["agents"], "robot")
+    robot.time_step = env.time_step
     env.set_robot(robot)
 
     # read training parameters

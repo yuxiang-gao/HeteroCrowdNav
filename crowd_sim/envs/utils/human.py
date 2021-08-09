@@ -5,6 +5,7 @@ from crowd_sim.envs.utils.state import JointState
 class Human(Agent):
     def __init__(self, config, section):
         super().__init__(config, section)
+        self.id = None
 
     def act(self, ob):
         """

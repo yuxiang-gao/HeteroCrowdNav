@@ -7,11 +7,11 @@ from crowd_nav.policy.multi_human_rl import MultiHumanRL
 
 
 class ValueNetwork1(nn.Module):
-    def __init__(self, input_dim, self_state_dim, mlp_dims, lstm_hidden_dim):
+    def __init__(self, input_dim, robot_state_dim, mlp_dims, lstm_hidden_dim):
         super().__init__()
-        self.self_state_dim = self_state_dim
+        self.robot_state_dim = robot_state_dim
         self.lstm_hidden_dim = lstm_hidden_dim
-        self.mlp = mlp(self_state_dim + lstm_hidden_dim, mlp_dims)
+        self.mlp = mlp(robot_state_dim + lstm_hidden_dim, mlp_dims)
         self.lstm = nn.LSTM(input_dim, lstm_hidden_dim, batch_first=True)
 
     def forward(self, state):
@@ -22,26 +22,26 @@ class ValueNetwork1(nn.Module):
         :return:
         """
         size = state.shape
-        self_state = state[:, 0, : self.self_state_dim]
-        # human_state = state[:, :, self.self_state_dim:]
+        robot_state = state[:, 0, : self.robot_state_dim]
+        # human_state = state[:, :, self.robot_state_dim:]
         h0 = torch.zeros(1, size[0], self.lstm_hidden_dim)
         c0 = torch.zeros(1, size[0], self.lstm_hidden_dim)
         output, (hn, cn) = self.lstm(state, (h0, c0))
         hn = hn.squeeze(0)
-        joint_state = torch.cat([self_state, hn], dim=1)
+        joint_state = torch.cat([robot_state, hn], dim=1)
         value = self.mlp(joint_state)
         return value
 
 
 class ValueNetwork2(nn.Module):
     def __init__(
-        self, input_dim, self_state_dim, mlp1_dims, mlp_dims, lstm_hidden_dim
+        self, input_dim, robot_state_dim, mlp1_dims, mlp_dims, lstm_hidden_dim
     ):
         super().__init__()
-        self.self_state_dim = self_state_dim
+        self.robot_state_dim = robot_state_dim
         self.lstm_hidden_dim = lstm_hidden_dim
         self.mlp1 = mlp(input_dim, mlp1_dims)
-        self.mlp = mlp(self_state_dim + lstm_hidden_dim, mlp_dims)
+        self.mlp = mlp(robot_state_dim + lstm_hidden_dim, mlp_dims)
         self.lstm = nn.LSTM(mlp1_dims[-1], lstm_hidden_dim, batch_first=True)
 
     def forward(self, state):
@@ -52,7 +52,7 @@ class ValueNetwork2(nn.Module):
         :return:
         """
         size = state.shape
-        self_state = state[:, 0, : self.self_state_dim]
+        robot_state = state[:, 0, : self.robot_state_dim]
 
         state = torch.reshape(state, (-1, size[2]))
         mlp1_output = self.mlp1(state)
@@ -62,7 +62,7 @@ class ValueNetwork2(nn.Module):
         c0 = torch.zeros(1, size[0], self.lstm_hidden_dim)
         output, (hn, cn) = self.lstm(mlp1_output, (h0, c0))
         hn = hn.squeeze(0)
-        joint_state = torch.cat([self_state, hn], dim=1)
+        joint_state = torch.cat([robot_state, hn], dim=1)
         value = self.mlp(joint_state)
         return value
 
@@ -85,7 +85,7 @@ class LstmRL(MultiHumanRL):
             mlp1_dims = lstm_config["mlp1_dims"]
             self.model = ValueNetwork2(
                 self.input_dim(),
-                self.self_state_dim,
+                self.robot_state_dim,
                 mlp1_dims,
                 mlp_dims,
                 global_state_dim,
@@ -93,7 +93,7 @@ class LstmRL(MultiHumanRL):
         else:
             self.model = ValueNetwork1(
                 self.input_dim(),
-                self.self_state_dim,
+                self.robot_state_dim,
                 mlp_dims,
                 global_state_dim,
             )
@@ -117,7 +117,7 @@ class LstmRL(MultiHumanRL):
         def dist(human):
             # sort human order by decreasing distance to the robot
             return np.linalg.norm(
-                np.array(human.position) - np.array(state.self_state.position)
+                np.array(human.position) - np.array(state.robot_state.position)
             )
 
         state.human_states = sorted(state.human_states, key=dist, reverse=True)

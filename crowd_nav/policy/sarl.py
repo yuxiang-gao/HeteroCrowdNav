@@ -11,7 +11,7 @@ class ValueNetwork(nn.Module):
     def __init__(
         self,
         input_dim,
-        self_state_dim,
+        robot_state_dim,
         mlp1_dims,
         mlp2_dims,
         mlp3_dims,
@@ -21,7 +21,7 @@ class ValueNetwork(nn.Module):
         cell_num,
     ):
         super().__init__()
-        self.self_state_dim = self_state_dim
+        self.robot_state_dim = robot_state_dim
         self.global_state_dim = mlp1_dims[-1]
         self.mlp1 = mlp(input_dim, mlp1_dims, last_relu=True)
         self.mlp2 = mlp(mlp1_dims[-1], mlp2_dims)
@@ -32,7 +32,7 @@ class ValueNetwork(nn.Module):
             self.attention = mlp(mlp1_dims[-1], attention_dims)
         self.cell_size = cell_size
         self.cell_num = cell_num
-        mlp3_input_dim = mlp2_dims[-1] + self.self_state_dim
+        mlp3_input_dim = mlp2_dims[-1] + self.robot_state_dim
         self.mlp3 = mlp(mlp3_input_dim, mlp3_dims)
         self.attention_weights = None
 
@@ -50,7 +50,7 @@ class ValueNetwork(nn.Module):
             lengths = torch.IntTensor([state.size()[1]])
 
         size = state.shape
-        self_state = state[:, 0, : self.self_state_dim]
+        robot_state = state[:, 0, : self.robot_state_dim]
         mlp1_output = self.mlp1(state.view((-1, size[2])))
         mlp2_output = self.mlp2(mlp1_output)
 
@@ -97,7 +97,7 @@ class ValueNetwork(nn.Module):
         weighted_feature = torch.sum(torch.mul(weights, features), dim=1)
 
         # concatenate agent's state with global weighted humans' state
-        joint_state = torch.cat([self_state, weighted_feature], dim=1)
+        joint_state = torch.cat([robot_state, weighted_feature], dim=1)
         value = self.mlp3(joint_state)
         return value
 
@@ -121,7 +121,7 @@ class SARL(MultiHumanRL):
         with_global_state = sarl_config["with_global_state"]
         self.model = ValueNetwork(
             self.input_dim(),
-            self.self_state_dim,
+            self.robot_state_dim,
             mlp1_dims,
             mlp2_dims,
             mlp3_dims,

@@ -1,9 +1,9 @@
-import abc
+from abc import ABC, abstractmethod
 import numpy as np
 import torch
 
 
-class Policy(object):
+class Policy(ABC):
     def __init__(self):
         """
         Base class for all policies, has an abstract method predict().
@@ -17,7 +17,7 @@ class Policy(object):
         # if agent is assumed to know the dynamics of real world
         self.env = None
 
-    @abc.abstractmethod
+    @abstractmethod
     def configure(self, config):
         return
 
@@ -48,7 +48,7 @@ class Policy(object):
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict)
 
-    @abc.abstractmethod
+    @abstractmethod
     def predict(self, state):
         """
         Policy takes state as input and output an action
@@ -59,7 +59,15 @@ class Policy(object):
     @staticmethod
     def reach_destination(state):
         robot_state = state.robot_state
-        if np.linalg.norm((robot_state.py - robot_state.gy, robot_state.px - robot_state.gx)) < robot_state.radius:
+        if (
+            np.linalg.norm(
+                (
+                    robot_state.py - robot_state.gy,
+                    robot_state.px - robot_state.gx,
+                )
+            )
+            < robot_state.radius
+        ):
             return True
         else:
             return False

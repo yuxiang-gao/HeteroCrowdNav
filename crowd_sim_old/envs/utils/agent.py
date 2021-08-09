@@ -1,7 +1,7 @@
-import abc
-import logging
 import numpy as np
 from numpy.linalg import norm
+import abc
+import logging
 from crowd_sim.envs.policy.policy_factory import policy_factory
 from crowd_sim.envs.utils.action import ActionXY, ActionRot
 from crowd_sim.envs.utils.state import ObservableState, FullState
@@ -13,11 +13,13 @@ class Agent(object):
         Base class for robot and human. Have the physical attributes of an agent.
 
         """
-        self.visible = config[section]["visible"]
-        self.v_pref = config[section]["v_pref"]
-        self.radius = config[section]["radius"]
-        self.policy = policy_factory[config[section]["policy"]]()
-        self.sensor = config[section]["sensor"]
+        config = config.get(section)
+        self.__dict__.update(config)
+        # self.visible = config.getboolean(section, "visible")
+        # self.v_pref = config.getfloat(section, "v_pref")
+        # self.radius = config.getfloat(section, "radius")
+        self.policy = policy_factory[config.get("policy")]()
+        # self.sensor = config.get(section, "sensor")
         self.kinematics = (
             self.policy.kinematics if self.policy is not None else None
         )
@@ -38,9 +40,6 @@ class Agent(object):
         )
 
     def set_policy(self, policy):
-        if self.time_step is None:
-            raise ValueError("Time step is None")
-        policy.set_time_step(self.time_step)
         self.policy = policy
         self.kinematics = policy.kinematics
 
@@ -55,8 +54,6 @@ class Agent(object):
     def set(self, px, py, gx, gy, vx, vy, theta, radius=None, v_pref=None):
         self.px = px
         self.py = py
-        self.sx = px
-        self.sy = py
         self.gx = gx
         self.gy = gy
         self.vx = vx
@@ -78,8 +75,9 @@ class Agent(object):
             next_vx = action.vx
             next_vy = action.vy
         else:
-            next_vx = action.v * np.cos(self.theta)
-            next_vy = action.v * np.sin(self.theta)
+            next_theta = self.theta + action.r
+            next_vx = action.v * np.cos(next_theta)
+            next_vy = action.v * np.sin(next_theta)
         return ObservableState(next_px, next_py, next_vx, next_vy, self.radius)
 
     def get_full_state(self):
@@ -104,9 +102,6 @@ class Agent(object):
 
     def get_goal_position(self):
         return self.gx, self.gy
-
-    def get_start_position(self):
-        return self.sx, self.sy
 
     def get_velocity(self):
         return self.vx, self.vy

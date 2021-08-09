@@ -28,12 +28,12 @@ class MultiHumanRL(CADRL):
                 else ActionRot(0, 0)
             )
         if self.action_space is None:
-            self.build_action_space(state.self_state.v_pref)
+            self.build_action_space(state.robot_state.v_pref)
         if not state.human_states:
             assert self.phase != "train"
             if hasattr(self, "attention_weights"):
                 self.attention_weights = list()
-            return self.select_greedy_action(state.self_state)
+            return self.select_greedy_action(state.robot_state)
         occupancy_maps = None
         probability = np.random.random()
         if self.phase == "train" and probability < self.epsilon:
@@ -45,7 +45,7 @@ class MultiHumanRL(CADRL):
             max_value = float("-inf")
             max_action = None
             for action in self.action_space:
-                next_self_state = self.propagate(state.self_state, action)
+                next_robot_state = self.propagate(state.robot_state, action)
                 if self.query_env:
                     (
                         next_human_states,
@@ -62,11 +62,11 @@ class MultiHumanRL(CADRL):
                         for human_state in state.human_states
                     ]
                     reward = self.compute_reward(
-                        next_self_state, next_human_states
+                        next_robot_state, next_human_states
                     )
                 batch_next_states = torch.cat(
                     [
-                        torch.Tensor([next_self_state + next_human_state]).to(
+                        torch.Tensor([next_robot_state + next_human_state]).to(
                             self.device
                         )
                         for next_human_state in next_human_states
@@ -89,7 +89,7 @@ class MultiHumanRL(CADRL):
                 next_state_value = self.model(rotated_batch_input).data.item()
                 value = (
                     reward
-                    + pow(self.gamma, self.time_step * state.self_state.v_pref)
+                    + pow(self.gamma, self.time_step * state.robot_state.v_pref)
                     * next_state_value
                 )
                 self.action_values.append(value)
@@ -146,7 +146,7 @@ class MultiHumanRL(CADRL):
         """
         state_tensor = torch.cat(
             [
-                torch.Tensor([state.self_state + human_state]).to(self.device)
+                torch.Tensor([state.robot_state + human_state]).to(self.device)
                 for human_state in state.human_states
             ],
             dim=0,

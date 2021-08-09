@@ -57,9 +57,9 @@ class CADRL(Policy):
         self.cell_num = None
         self.cell_size = None
         self.om_channel_size = None
-        self.self_state_dim = 6
+        self.robot_state_dim = 6
         self.human_state_dim = 7
-        self.joint_state_dim = self.self_state_dim + self.human_state_dim
+        self.joint_state_dim = self.robot_state_dim + self.human_state_dim
 
     def configure(self, config):
         self.set_common_parameters(config)
@@ -182,7 +182,7 @@ class CADRL(Policy):
                 else ActionRot(0, 0)
             )
         if self.action_space is None:
-            self.build_action_space(state.self_state.v_pref)
+            self.build_action_space(state.robot_state.v_pref)
         if not state.human_states:
             assert self.phase != "train"
             return self.select_greedy_action(state.robot_state)
@@ -197,7 +197,7 @@ class CADRL(Policy):
             max_min_value = float("-inf")
             max_action = None
             for action in self.action_space:
-                next_self_state = self.propagate(state.self_state, action)
+                next_robot_state = self.propagate(state.robot_state, action)
                 if self.query_env:
                     (
                         next_human_states,
@@ -214,11 +214,11 @@ class CADRL(Policy):
                         for human_state in state.human_states
                     ]
                     reward = self.compute_reward(
-                        next_self_state, next_human_states
+                        next_robot_state, next_human_states
                     )
                 batch_next_states = torch.cat(
                     [
-                        torch.Tensor([next_self_state + next_human_state]).to(
+                        torch.Tensor([next_robot_state + next_human_state]).to(
                             self.device
                         )
                         for next_human_state in next_human_states
@@ -230,7 +230,7 @@ class CADRL(Policy):
                 min_output, min_index = torch.min(outputs, 0)
                 min_value = (
                     reward
-                    + pow(self.gamma, self.time_step * state.self_state.v_pref)
+                    + pow(self.gamma, self.time_step * state.robot_state.v_pref)
                     * min_output.data.item()
                 )
                 self.action_values.append(min_value)
@@ -302,7 +302,7 @@ class CADRL(Policy):
         :return: tensor of shape (len(state), )
         """
         assert len(state.human_states) == 1
-        state = torch.Tensor(state.self_state + state.human_states[0]).to(
+        state = torch.Tensor(state.robot_state + state.human_states[0]).to(
             self.device
         )
         out_state = self.rotate(state.unsqueeze(0)).squeeze(dim=0)
