@@ -176,17 +176,20 @@ class SceneManager(object):
         self.discomfort_dist = self.config("reward", "discomfort_dist")
         self.randomize_attributes = self.config("randomize_attributes")
 
+        # group related
+        self.max_groups = None
+
     def set_scenario(self, scenario, seed):
         self.humans = []
         self.membership = []
-        self.scenario_config = ScenarioManager(scenario, self.config, seed)
+        self.scenario_manager = ScenarioManager(scenario, self.config, seed)
         # pass obstacles to Agent class
         JointState.set_obstacles(self.get_obstacles())
         self.rng = np.random.default_rng(seed=seed)
         # self.obstacles_sampled = self.sample_obstalces(self.get_obstacles())
 
     def get_current_scenario(self):
-        return self.scenario_config.scenario.value
+        return self.scenario_manager.scenario.value
 
     def get_scene(self):
         group_membership = []
@@ -198,13 +201,13 @@ class SceneManager(object):
                 group_membership.append(group)
         return (
             self.humans,
-            self.scenario_config.obstacles,
+            self.scenario_manager.obstacles,
             group_membership,
             individual_membership,
         )
 
     def get_obstacles(self):
-        return self.scenario_config.obstacles
+        return self.scenario_manager.obstacles
 
     def spawn(
         self,
@@ -218,9 +221,9 @@ class SceneManager(object):
         # human_idx = np.array(range(sum(group_sizes)))
         # Spawn robot
         if set_robot:
-            center, goal = self.scenario_config.get_robot_spawn_position()
-            logging.info(f"Spawn robot, center: {center}, goal: {goal}")
-            self.spawn_robot(center, goal)
+            start, goal = self.scenario_manager.get_robot_spawn_position()
+            logging.info(f"Spawn robot from {start} -> {goal}")
+            self.spawn_robot(start, goal)
 
         if use_groups:
             if group_sizes is None:
@@ -236,34 +239,20 @@ class SceneManager(object):
                             break
                         else:
                             group_sizes.append(size)
+                logging.info(f"Generating groups of size: {group_sizes}")
         else:
             group_sizes = np.ones(num_human)
         human_idx = np.arange(num_human)
         self.membership = self.split_array(human_idx, group_sizes)
 
-        logging.info(f"Generating groups of size: {group_sizes}")
         for i, size in enumerate(group_sizes):
-            center, goal = self.scenario_config.get_spawn_positions(group_sizes)
+            center, goal = self.scenario_manager.get_spawn_positions(
+                group_sizes
+            )
             logging.info(
                 f"Spawn group {i} of size {size}, center: {center}, goal: {goal}"
             )
-            if self.scenario_config.scenario == Scenario.LONG_CORRIDOR:
-                if size == 3:
-                    group_config = np.array([[0, 0], [-1, 1], [1, -1]])
-                elif size == 4:
-                    group_config = np.array(
-                        [[-1, 1], [1, -1], [-0.5, 0.5], [0.5, -0.5]]
-                    )
-                elif size == 5:
-                    group_config = np.array(
-                        [[0, 0], [-1, 1], [1, -1], [-0.5, 0.5], [0.5, -0.5]]
-                    )
-                self.humans += self.spawn_group_with_form(
-                    size, center, goal, group_config
-                )
-                # logging.info(f"Config group {[x.get_position() for x in self.humans]}")
-            else:
-                self.humans += self.spawn_group(size, center, goal)
+            self.humans += self.spawn_group(size, center, goal)
 
     def spawn_robot(self, start, goal):
         # noise = self.random_vector(length=(self.robot_radius * 2 + self.discomfort_dist))
@@ -276,17 +265,14 @@ class SceneManager(object):
         #         spawn_pos += self.random_vector(
         #             length=agent_radius
         #         )  # gentlely nudge the new ped to avoid collision
-        orientation = np.array(goal) - np.array(start)
-        vector = orientation / np.linalg.norm(orientation)
-        angle = np.arctan2(*vector)
-        self.robot.set(*start, *goal, 0, 0, angle)
+        self.robot.set(*start, *goal, 0, 0)
 
     def spawn_group_with_form(
-        self, size, center, goal, config=[[1, 0], [0, 0.25], [0, -0.25]]
+        self, size, center, goal, form=[[1, 0], [0, 0.25], [0, -0.25]]
     ):
         humans = []
         while True:
-            spawn_pos = np.asarray(center) + np.asarray(config)
+            spawn_pos = np.asarray(center) + np.asarray(form)
             while True:
                 collision = False
                 for pos in spawn_pos:
@@ -304,7 +290,7 @@ class SceneManager(object):
                 human = Human(self.config, "humans")
                 if self.randomize_attributes:
                     human.sample_random_attributes()
-                human.set(*pos, *(goal), 0, 0, 0)  # TODO: set theta?
+                human.set(*pos, *goal, 0, 0)
                 humans.append(human)
             # logging.info(f"spawn humans at {spawn_pos}, {len(humans)},{size}")
             if len(humans) == size:
@@ -327,7 +313,7 @@ class SceneManager(object):
             human = Human(self.config, "humans")
             if self.randomize_attributes:
                 human.sample_random_attributes()
-            human.set(*spawn_pos, *(goal), 0, 0, 0)  # TODO: set theta?
+            human.set(*spawn_pos, *goal, 0, 0)
             humans.append(human)
             if len(humans) == size:
                 return humans

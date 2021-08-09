@@ -129,9 +129,7 @@ def main():
     logging.info("Configuring environment...")
     env = gym.make("CrowdSim-v0")
     env.configure(config("env"))
-    robot = Robot(config("env", "agents"), "robot")
-    robot.time_step = env.time_step
-    env.set_robot(robot)
+    robot = env.robot
 
     # read training parameters
     train_config = config("train")

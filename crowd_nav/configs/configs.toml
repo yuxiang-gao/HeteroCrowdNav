@@ -31,8 +31,9 @@ robot_sensor_range = 5
 
 
     [env.scenarios]
-    train_val_scenario = "circle_crossing"
-    test_scenario = "circle_crossing"
+    phase.train = "circle_crossing"
+    phase.val = "circle_crossing"
+    phase.test = "circle_crossing"
     human_num = 5
     nonstop_human = false
     centralized_planning = false
