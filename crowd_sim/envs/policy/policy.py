@@ -49,10 +49,13 @@ class Policy(object):
         self.model.load_state_dict(state_dict)
 
     @abc.abstractmethod
-    def predict(self, state):
+    def predict(self, state, groups=None, obstacles=None):
         """
         Policy takes state as input and output an action
-
+        :param state:
+        :param groups: group membership
+        :param obstacles: obstacles
+        :return:
         """
         return
 

@@ -23,6 +23,7 @@ tensorboardX = "^2.4"
 tensorboard = "^2.5.0"
 torch-tb-profiler = "^0.2.1"
 socialforce = { git = "https://github.com/ChanganVR/socialforce.git" }
+pysocialforce = { git = "https://github.com/yuxiang-gao/pysocialforce.git" }
 pyrvo2 = { path = "thirdparty/pyrvo2" }
 
 [tool.poetry.dev-dependencies]

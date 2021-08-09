@@ -72,7 +72,7 @@ class ORCA(Policy):
     def set_phase(self, phase):
         return
 
-    def predict(self, state):
+    def predict(self, state, groups=None, obstacles=None):
         """
         Create a rvo2 simulation at each time step and run one step
         Python-RVO2 API: https://github.com/sybrenstuvel/Python-RVO2/blob/master/src/rvo2.pyx
@@ -83,6 +83,9 @@ class ORCA(Policy):
         :param state:
         :return:
         """
+        if groups is not None:
+            raise NotImplementedError
+
         robot_state = state.robot_state
         params = (
             self.neighbor_dist,
@@ -115,6 +118,19 @@ class ORCA(Policy):
                     self.max_speed,
                     human_state.velocity
                 )
+
+            if obstacles is not None:
+                # only add obstacle once when setting up
+                for (x_min, x_max, y_min, y_max) in obstacles:
+                    self.sim.addObstacle(
+                        [
+                            (x_max, y_min),
+                            (x_min, y_min),
+                            (x_min, y_max),
+                            (x_max, y_max),
+                        ]
+                    )
+                self.sim.processObstacles()
         else:
             self.sim.setAgentPosition(0, robot_state.position)
             self.sim.setAgentVelocity(0, robot_state.velocity)
