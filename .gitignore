@@ -13,3 +13,5 @@ venv*/
 data/
 *.mp4
 videos/
+crowd_nav/test.ipynb
+thirdparty/pyrvo2
