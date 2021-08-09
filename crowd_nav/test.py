@@ -3,7 +3,6 @@ import argparse
 from pathlib import Path
 
 import gym
-import toml
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,6 +11,7 @@ from crowd_nav.utils.explorer import Explorer
 from crowd_nav.policy.policy_factory import policy_factory
 from crowd_sim.envs.utils.robot import Robot
 from crowd_sim.envs.policy.orca import ORCA
+from crowd_sim.envs.utils.config import Config
 
 
 def main():
@@ -78,7 +78,7 @@ def main():
     else:
         config_file = args.config
 
-    config = toml.load(config_file)
+    config = Config(config_file)
     policy_config = config["policy"]
     env_config = config["env"]
     agent_config = env_config["agents"]
