@@ -72,6 +72,8 @@ class CrowdSim(gym.Env):
         self.human_starts = []
         self.human_goals = []
 
+        self.obstacles = []  # xmin,xmax,ymin,ymax
+
         self.phase = None
 
     def configure(self, config):
@@ -97,14 +99,14 @@ class CrowdSim(gym.Env):
             "val": config["val_size"],
             "test": config["test_size"],
         }
-        self.train_val_scenario = config["sim"]["train_val_scenario"]
-        self.test_scenario = config["sim"]["test_scenario"]
-        self.square_width = config["sim"]["square_width"]
-        self.circle_radius = config["sim"]["circle_radius"]
-        self.human_num = config["sim"]["human_num"]
+        self.train_val_scenario = config["scenarios"]["train_val_scenario"]
+        self.test_scenario = config["scenarios"]["test_scenario"]
+        self.square_width = config["scenarios"]["square_width"]
+        self.circle_radius = config["scenarios"]["circle_radius"]
+        self.human_num = config["scenarios"]["human_num"]
 
         self.nonstop_human = self.agent_config["nonstop_human"]
-        self.centralized_planning = config["sim"]["centralized_planning"]
+        self.centralized_planning = config["scenarios"]["centralized_planning"]
         self.case_counter = {"train": 0, "test": 0, "val": 0}
 
         human_policy = self.agent_config["humans"]["policy"]
@@ -135,6 +137,9 @@ class CrowdSim(gym.Env):
 
     def set_robot(self, robot):
         self.robot = robot
+
+    def set_obstacles(self, obs):
+        self.obstacles = obs
 
     def generate_human(self, human=None):
         if human is None:

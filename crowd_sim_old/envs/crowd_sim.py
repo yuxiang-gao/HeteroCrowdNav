@@ -75,12 +75,12 @@ class CrowdSim(gym.Env):
                 "val": config.get("val_size"),
                 "test": config.get("test_size"),
             }
-            self.__dict__.update(config["sim"])
-            # self.train_val_sim = config.get("sim", "train_val_sim")
-            # self.test_scenario = config.get("sim", "test_scenario")
-            # self.square_width = config.getfloat("sim", "square_width")
-            # self.circle_radius = config.getfloat("sim", "circle_radius")
-            # self.human_num = config.getint("sim", "human_num")
+            self.__dict__.update(config["scenarios"])
+            # self.train_val_sim = config.get("scenarios", "train_val_sim")
+            # self.test_scenario = config.get("scenarios", "test_scenario")
+            # self.square_width = config.getfloat("scenarios", "square_width")
+            # self.circle_radius = config.getfloat("scenarios", "circle_radius")
+            # self.human_num = config.getint("scenarios", "human_num")
         else:
             raise NotImplementedError
         self.case_counter = {"train": 0, "test": 0, "val": 0}
