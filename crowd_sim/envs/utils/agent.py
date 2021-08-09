@@ -52,7 +52,7 @@ class Agent(object):
         self.v_pref = np.random.uniform(0.5, 1.5)
         self.radius = np.random.uniform(0.3, 0.5)
 
-    def set(self, px, py, gx, gy, vx, vy, theta, radius=None, v_pref=None):
+    def set(self, px, py, gx, gy, vx, vy, theta=None, radius=None, v_pref=None):
         self.px = px
         self.py = py
         self.sx = px
@@ -61,7 +61,12 @@ class Agent(object):
         self.gy = gy
         self.vx = vx
         self.vy = vy
-        self.theta = theta
+        if theta is None:
+            # auto set theta
+            vec = np.array([gx - px, gy - py])
+            self.theta = np.arctan2(*(vec / np.linalg.norm(vec)))
+        else:
+            self.theta = theta
         if radius is not None:
             self.radius = radius
         if v_pref is not None:
