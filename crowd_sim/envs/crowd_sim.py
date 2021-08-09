@@ -13,7 +13,12 @@ from crowd_sim.envs.utils.state import tensor_to_joint_state, JointState
 from crowd_sim.envs.utils.action import ActionRot
 from crowd_sim.envs.utils.human import Human
 from crowd_sim.envs.utils.info import *
-from crowd_sim.envs.utils.utils import point_to_segment_dist
+from crowd_sim.envs.utils.utils import *
+from crowd_sim.envs.utils.scenarios import (
+    Scenario,
+    ScenarioConfig,
+    SceneManager,
+)
 
 
 class CrowdSim(gym.Env):
@@ -25,24 +30,16 @@ class CrowdSim(gym.Env):
         Agent can either be human or robot.
         humans are controlled by a unknown and fixed policy.
         robot is controlled by a known and learnable policy.
-
         """
-        self.time_limit = None
-        self.time_step = None
         self.robot = None
         self.humans = None
         self.global_time = None
         self.robot_sensor_range = None
-        # reward function
-        self.success_reward = None
-        self.collision_penalty = None
-        self.discomfort_dist = None
-        self.discomfort_penalty_factor = None
         # simulation configuration
         self.config = None
-        self.case_capacity = None
-        self.case_size = None
-        self.case_counter = None
+        self.agent_config = None
+        self.time_limit = None
+        self.time_step = None
         self.randomize_attributes = None
         self.train_val_scenario = None
         self.test_scenario = None
@@ -53,7 +50,19 @@ class CrowdSim(gym.Env):
         self.nonstop_human = None
         self.centralized_planning = None
         self.centralized_planner = None
-
+        # reward function
+        self.success_reward = None
+        self.collision_penalty = None
+        self.discomfort_dist = None
+        self.discomfort_penalty_factor = None
+        # Internal environment configuration
+        self.case_capacity = None
+        self.case_size = None
+        self.case_counter = None
+        # self.parallel = None
+        # self.max_tries = None
+        self.train_val_scenario = None
+        self.test_scenario = None
         # for visualization
         self.states = None
         self.action_values = None
@@ -72,53 +81,58 @@ class CrowdSim(gym.Env):
         self.human_starts = []
         self.human_goals = []
 
+        self.scene_manager = None
         self.obstacles = []  # xmin,xmax,ymin,ymax
-
-        self.phase = None
 
     def configure(self, config):
         self.config = config
-        self.agent_config = config["agents"]
-        self.time_limit = config["time_limit"]
-        self.time_step = config["time_step"]
-        self.randomize_attributes = config["randomize_attributes"]
-        self.robot_sensor_range = config["robot_sensor_range"]
-        self.success_reward = config["reward"]["success_reward"]
-        self.collision_penalty = config["reward"]["collision_penalty"]
-        self.discomfort_dist = config["reward"]["discomfort_dist"]
-        self.discomfort_penalty_factor = config["reward"][
-            "discomfort_penalty_factor"
-        ]
-        self.case_capacity = {
-            "train": np.iinfo(np.uint32).max - 2000,
-            "val": 1000,
-            "test": 1000,
-        }
-        self.case_size = {
-            "train": config["train_size"],
-            "val": config["val_size"],
-            "test": config["test_size"],
-        }
-        self.train_val_scenario = config["scenarios"]["train_val_scenario"]
-        self.test_scenario = config["scenarios"]["test_scenario"]
-        self.square_width = config["scenarios"]["square_width"]
-        self.circle_radius = config["scenarios"]["circle_radius"]
-        self.human_num = config["scenarios"]["human_num"]
+        self.agent_config = config("agents")
+        self.time_limit = config("time_limit")
+        self.time_step = config("time_step")
+        self.randomize_attributes = config("randomize_attributes")
+        self.robot_sensor_range = config("robot_sensor_range")
+        self.success_reward = config("reward", "success_reward")
+        self.collision_penalty = config("reward", "collision_penalty")
+        self.discomfort_dist = config("reward", "discomfort_dist")
+        self.discomfort_penalty_factor = config(
+            "reward", "discomfort_penalty_factor"
+        )
+        if (
+            self.agent_config("humans", "policy") == "orca"
+            or self.agent_config("humans", "policy") == "socialforce"
+            or self.agent_config("humans", "policy")
+            == "centralized_socialforce"
+        ):
+            self.case_capacity = {
+                "train": np.iinfo(np.uint32).max - 2000,
+                "val": 1000,
+                "test": 1000,
+            }
+            self.case_size = {
+                "train": np.iinfo(np.uint32).max - 2000,
+                "val": config("val_size"),
+                "test": config("test_size"),
+            }
+            self.train_val_scenario = config("scenarios", "train_val_scenario")
+            self.test_scenario = config("scenarios", "test_scenario")
+            # self.human_num = config("scenarios", "human_num")
+            # self.nonstop_human = self.agent_config("scenarios", "nonstop_human")
+            # self.centralized_planning = config(
+            #     "scenarios", "centralized_planning"
+            # )
 
-        self.nonstop_human = self.agent_config["nonstop_human"]
-        self.centralized_planning = config["scenarios"]["centralized_planning"]
+            human_policy = self.agent_config["humans"]["policy"]
+            if self.centralized_planning:
+                if human_policy == "socialforce":
+                    logging.warning(
+                        "Current socialforce policy only works in decentralized way with visible robot!"
+                    )
+                self.centralized_planner = policy_factory[
+                    "centralized_" + human_policy
+                ]()
+        else:
+            raise NotImplementedError
         self.case_counter = {"train": 0, "test": 0, "val": 0}
-
-        human_policy = self.agent_config["humans"]["policy"]
-        if self.centralized_planning:
-            if human_policy == "socialforce":
-                logging.warning(
-                    "Current socialforce policy only works in decentralized way with visible robot!"
-                )
-            self.centralized_planner = policy_factory[
-                "centralized_" + human_policy
-            ]()
-
         logging.info("human number: {}".format(self.human_num))
         if self.randomize_attributes:
             logging.info("Randomize human's radius and preferred speed")
@@ -129,11 +143,11 @@ class CrowdSim(gym.Env):
                 self.train_val_scenario, self.test_scenario
             )
         )
-        logging.info(
-            "Square width: {}, circle width: {}".format(
-                self.square_width, self.circle_radius
-            )
-        )
+        # logging.info(
+        #     "Square width: {}, circle width: {}".format(
+        #         self.square_width, self.circle_radius
+        #     )
+        # )
 
     def set_robot(self, robot):
         self.robot = robot
@@ -141,80 +155,86 @@ class CrowdSim(gym.Env):
     def set_obstacles(self, obs):
         self.obstacles = obs
 
-    def generate_human(self, human=None):
-        if human is None:
-            human = Human(self.agent_config, "humans")
-        if self.randomize_attributes:
-            human.sample_random_attributes()
+    def set_scene(self, scenario=None, seed=None):
+        if self.scene_manager is None:
+            self.scene_manager = SceneManager(
+                scenario, self.robot, self.config, seed
+            )
+        else:
+            self.scene_manager.set_scenario(scenario, seed)
 
-        if self.current_scenario == "circle_crossing":
-            while True:
-                angle = np.random.random() * np.pi * 2
-                # add some noise to simulate all the possible cases robot could meet with human
-                px_noise = (np.random.random() - 0.5) * human.v_pref
-                py_noise = (np.random.random() - 0.5) * human.v_pref
-                px = self.circle_radius * np.cos(angle) + px_noise
-                py = self.circle_radius * np.sin(angle) + py_noise
-                collide = False
-                for agent in [self.robot] + self.humans:
-                    min_dist = (
-                        human.radius + agent.radius + self.discomfort_dist
-                    )
-                    if (
-                        norm((px - agent.px, py - agent.py)) < min_dist
-                        or norm((px - agent.gx, py - agent.gy)) < min_dist
-                    ):
-                        collide = True
-                        break
-                if not collide:
-                    break
-            human.set(px, py, -px, -py, 0, 0, 0)
+    # def generate_human(self, human=None):
+    #     if human is None:
+    #         human = Human(self.agent_config, "humans")
+    #     if self.randomize_attributes:
+    #         human.sample_random_attributes()
 
-        elif self.current_scenario == "square_crossing":
-            if np.random.random() > 0.5:
-                sign = -1
-            else:
-                sign = 1
-            while True:
-                px = np.random.random() * self.square_width * 0.5 * sign
-                py = (np.random.random() - 0.5) * self.square_width
-                collide = False
-                for agent in [self.robot] + self.humans:
-                    if (
-                        norm((px - agent.px, py - agent.py))
-                        < human.radius + agent.radius + self.discomfort_dist
-                    ):
-                        collide = True
-                        break
-                if not collide:
-                    break
-            while True:
-                gx = np.random.random() * self.square_width * 0.5 * -sign
-                gy = (np.random.random() - 0.5) * self.square_width
-                collide = False
-                for agent in [self.robot] + self.humans:
-                    if (
-                        norm((gx - agent.gx, gy - agent.gy))
-                        < human.radius + agent.radius + self.discomfort_dist
-                    ):
-                        collide = True
-                        break
-                if not collide:
-                    break
-            human.set(px, py, gx, gy, 0, 0, 0)
+    #     if self.current_scenario == "circle_crossing":
+    #         while True:
+    #             angle = np.random.random() * np.pi * 2
+    #             # add some noise to simulate all the possible cases robot could meet with human
+    #             px_noise = (np.random.random() - 0.5) * human.v_pref
+    #             py_noise = (np.random.random() - 0.5) * human.v_pref
+    #             px = self.circle_radius * np.cos(angle) + px_noise
+    #             py = self.circle_radius * np.sin(angle) + py_noise
+    #             collide = False
+    #             for agent in [self.robot] + self.humans:
+    #                 min_dist = (
+    #                     human.radius + agent.radius + self.discomfort_dist
+    #                 )
+    #                 if (
+    #                     norm((px - agent.px, py - agent.py)) < min_dist
+    #                     or norm((px - agent.gx, py - agent.gy)) < min_dist
+    #                 ):
+    #                     collide = True
+    #                     break
+    #             if not collide:
+    #                 break
+    #         human.set(px, py, -px, -py, 0, 0, 0)
 
-        return human
+    #     elif self.current_scenario == "square_crossing":
+    #         if np.random.random() > 0.5:
+    #             sign = -1
+    #         else:
+    #             sign = 1
+    #         while True:
+    #             px = np.random.random() * self.square_width * 0.5 * sign
+    #             py = (np.random.random() - 0.5) * self.square_width
+    #             collide = False
+    #             for agent in [self.robot] + self.humans:
+    #                 if (
+    #                     norm((px - agent.px, py - agent.py))
+    #                     < human.radius + agent.radius + self.discomfort_dist
+    #                 ):
+    #                     collide = True
+    #                     break
+    #             if not collide:
+    #                 break
+    #         while True:
+    #             gx = np.random.random() * self.square_width * 0.5 * -sign
+    #             gy = (np.random.random() - 0.5) * self.square_width
+    #             collide = False
+    #             for agent in [self.robot] + self.humans:
+    #                 if (
+    #                     norm((gx - agent.gx, gy - agent.gy))
+    #                     < human.radius + agent.radius + self.discomfort_dist
+    #                 ):
+    #                     collide = True
+    #                     break
+    #             if not collide:
+    #                 break
+    #         human.set(px, py, gx, gy, 0, 0, 0)
+
+    #     return human
 
     def reset(self, phase="test", test_case=None):
         """
         Set px, py, gx, gy, vx, vy, theta for robot and humans
         :return:
         """
-        assert phase in ["train", "val", "test"]
-        self.phase = phase
         if self.robot is None:
             raise AttributeError("Robot has to be set!")
-
+        assert phase in ["train", "val", "test"]
         if test_case is not None:
             self.case_counter[phase] = test_case
         self.global_time = 0
@@ -225,15 +245,15 @@ class CrowdSim(gym.Env):
             "test": self.case_capacity["val"],
         }
 
-        self.robot.set(
-            0, -self.circle_radius, 0, self.circle_radius, 0, 0, np.pi / 2
-        )
+        # self.robot.set(
+        #     0, -self.circle_radius, 0, self.circle_radius, 0, 0, np.pi / 2
+        # )
         if self.case_counter[phase] >= 0:
             np.random.seed(base_seed[phase] + self.case_counter[phase])
             random.seed(base_seed[phase] + self.case_counter[phase])
             if phase == "test":
                 logging.debug(
-                    "current test seed is:{}".format(
+                    "current test seed is: {}".format(
                         base_seed[phase] + self.case_counter[phase]
                     )
                 )

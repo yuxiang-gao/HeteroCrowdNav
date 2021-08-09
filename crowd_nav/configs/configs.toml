@@ -33,16 +33,30 @@ robot_sensor_range = 5
     [env.scenarios]
     train_val_scenario = "circle_crossing"
     test_scenario = "circle_crossing"
-    square_width = 10
-    
     human_num = 5
+    nonstop_human = false
     centralized_planning = false
+    map_size = [10, 10]
 
         [env.scenarios.circle_crossing]
         circle_radius = 4
 
+        [env.scenarios.square_crossing]
+        square_width = 10
+
+        [env.scenarios.corner]
+        width = 7
+
+        [env.scenarios.corridor]
+        width = 7
+        length = 5
+
+        [env.scenarios.t_intersection]
+        width = 7
+        length = 5
+
+
     [env.agents]
-    nonstop_human = false
 
         [env.agents.humans]
         visible = true

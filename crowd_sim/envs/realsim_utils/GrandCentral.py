@@ -1,7 +1,7 @@
-'''
+"""
 methods for preprocessing grand central station datasets offline
 and for simulation in crowd_sim.py
-'''
+"""
 import scipy.io as sio
 import numpy as np
 import random
@@ -105,10 +105,10 @@ def create_GC_metadata(raw_data_path, meta_data_path):
     for dir_name in dir_list:
 
         person_trajectory_txt_path = os.path.join(raw_data_path, dir_name)
-        pid = int(dir_name.replace('.txt', ''))
+        pid = int(dir_name.replace(".txt", ""))
         if pid == 1:
-            print('check')
-        with open(person_trajectory_txt_path, 'r') as f:
+            print("check")
+        with open(person_trajectory_txt_path, "r") as f:
             trajectory_list = f.read().split()
             for i in range(len(trajectory_list) // 3):
                 x = int(trajectory_list[3 * i]) / GC_IMAGE_WIDTH
@@ -124,14 +124,20 @@ def create_GC_metadata(raw_data_path, meta_data_path):
             f_data_list[t].append(pid)
 
     # show some message
-    print('pedestrian_data_list size: ', len(p_data_list))
-    print('frame_data_list size: ', len(f_data_list))
-    print('max num of person in one frame', count_frame_p_num(f_data_list))
+    print("pedestrian_data_list size: ", len(p_data_list))
+    print("frame_data_list size: ", len(f_data_list))
+    print("max num of person in one frame", count_frame_p_num(f_data_list))
 
-    with open(meta_data_path, 'w') as f:
-        json.dump({'frame_data_list': f_data_list, 'pedestrian_data_list': p_data_list}, f)
+    with open(meta_data_path, "w") as f:
+        json.dump(
+            {
+                "frame_data_list": f_data_list,
+                "pedestrian_data_list": p_data_list,
+            },
+            f,
+        )
 
-    print('create %s successfully!' % meta_data_path)
+    print("create %s successfully!" % meta_data_path)
 
 
 def count_frame_p_num(f_data_list):
@@ -142,13 +148,13 @@ def count_frame_p_num(f_data_list):
 
 
 def main():
-    GC_raw_data_path = 'data/GC/Annotation'
-    GC_meta_data_path = 'data/GC_meta_data.json'
-    GC_train_test_data_path = 'data/GC.npz'
+    GC_raw_data_path = "data/GC/Annotation"
+    GC_meta_data_path = "data/GC_meta_data.json"
+    GC_train_test_data_path = "data/GC.npz"
 
     create_GC_metadata(GC_raw_data_path, GC_meta_data_path)
     create_GC_train_test_data(GC_meta_data_path, GC_train_test_data_path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
