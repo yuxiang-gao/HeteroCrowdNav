@@ -79,10 +79,10 @@ def main():
         config_file = args.config
 
     config = Config(config_file)
-    policy_config = config["policy"]
-    env_config = config["env"]
-    agent_config = env_config["agents"]
-    train_config = config["train"]
+    policy_config = config("policy")
+    env_config = config("env")
+    agent_config = env_config("agents")
+    train_config = config("train")
 
     # configure policy
     policy = policy_factory[policy_config["name"]]()
@@ -108,23 +108,24 @@ def main():
         env_config.sim.human_num = args.human_num
     env = gym.make("CrowdSim-v0")
     env.configure(env_config)
+    robot = env.robot
 
-    if args.square:
-        env.test_scenario = "square_crossing"
-    if args.circle:
-        env.test_scenario = "circle_crossing"
-    if args.test_scenario is not None:
-        env.test_scenario = args.test_scenario
+    # if args.square:
+    #     env.test_scenario = "square_crossing"
+    # if args.circle:
+    #     env.test_scenario = "circle_crossing"
+    # if args.test_scenario is not None:
+    #     env.test_scenario = args.test_scenario
 
-    robot = Robot(agent_config, "robot")
-    env.set_robot(robot)
-    robot.time_step = env.time_step
+    # robot = Robot(agent_config, "robot")
+    # env.set_robot(robot)
+    # robot.time_step = env.time_step
     robot.set_policy(policy)
     explorer = Explorer(env, robot, device, None, gamma=0.9)
 
-    epsilon_end = train_config["epsilon_end"]
-    if not isinstance(robot.policy, ORCA):
-        robot.policy.set_epsilon(epsilon_end)
+    # epsilon_end = train_config["epsilon_end"]
+    # if not isinstance(robot.policy, ORCA):
+    #     robot.policy.set_epsilon(epsilon_end)
 
     policy.set_phase(args.phase)
     policy.set_device(device)
@@ -206,7 +207,7 @@ def main():
             test_angle_seeds = np.array(env.test_scene_seeds)
             b = [i * 0.01 for i in range(101)]
             n, bins, patches = plt.hist(test_angle_seeds, b, facecolor="g")
-            plt.savefig(os.path.join(args.model_dir, "test_scene_hist.png"))
+            plt.savefig(Path(args.model_dir, "test_scene_hist.png"))
             plt.close()
 
 
