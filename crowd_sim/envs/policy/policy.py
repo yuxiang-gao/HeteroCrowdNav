@@ -49,17 +49,28 @@ class Policy(object):
         self.model.load_state_dict(state_dict)
 
     @abc.abstractmethod
-    def predict(self, state):
+    def predict(self, state, groups=None, obstacles=None):
         """
         Policy takes state as input and output an action
-
+        :param state:
+        :param groups: group membership
+        :param obstacles: obstacles
+        :return:
         """
         return
 
     @staticmethod
     def reach_destination(state):
         robot_state = state.robot_state
-        if np.linalg.norm((robot_state.py - robot_state.gy, robot_state.px - robot_state.gx)) < robot_state.radius:
+        if (
+            np.linalg.norm(
+                (
+                    robot_state.py - robot_state.gy,
+                    robot_state.px - robot_state.gx,
+                )
+            )
+            < robot_state.radius
+        ):
             return True
         else:
             return False

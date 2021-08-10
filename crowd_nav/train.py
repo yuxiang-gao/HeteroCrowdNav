@@ -81,8 +81,8 @@ def main():
 
         # load config
         config = Config(config_dir)
-        config("policy", "name") = args.policy
-        config("policy", "tag") = args.tag
+        config["policy"]["name"] = args.policy
+        config["policy"]["tag"] = args.tag
 
         # store current config to output
         config.dump(config_output)
@@ -122,16 +122,14 @@ def main():
     policy = policy_factory[args.policy]()
     if not policy.trainable:
         parser.error("Policy has to be trainable")
-    policy.configure(config["policy"])
+    policy.configure(config("policy"))
     policy.set_device(device)
 
     # configure environment
     logging.info("Configuring environment...")
     env = gym.make("CrowdSim-v0")
     env.configure(config("env"))
-    robot = Robot(config("env", "agents"), "robot")
-    robot.time_step = env.time_step
-    env.set_robot(robot)
+    robot = env.robot
 
     # read training parameters
     train_config = config("train")

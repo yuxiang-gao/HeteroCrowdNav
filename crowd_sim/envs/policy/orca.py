@@ -53,10 +53,10 @@ class ORCA(Policy):
 
         """
         super().__init__()
-        self.name = 'ORCA'
+        self.name = "ORCA"
         self.trainable = False
         self.multiagent_training = True
-        self.kinematics = 'holonomic'
+        self.kinematics = "holonomic"
         self.safety_space = 0
         self.neighbor_dist = 10
         self.max_neighbors = 10
@@ -72,7 +72,7 @@ class ORCA(Policy):
     def set_phase(self, phase):
         return
 
-    def predict(self, state):
+    def predict(self, state, groups=None, obstacles=None):
         """
         Create a rvo2 simulation at each time step and run one step
         Python-RVO2 API: https://github.com/sybrenstuvel/Python-RVO2/blob/master/src/rvo2.pyx
@@ -83,18 +83,52 @@ class ORCA(Policy):
         :param state:
         :return:
         """
+
         robot_state = state.robot_state
-        params = self.neighbor_dist, self.max_neighbors, self.time_horizon, self.time_horizon_obst
-        if self.sim is not None and self.sim.getNumAgents() != len(state.human_states) + 1:
+        params = (
+            self.neighbor_dist,
+            self.max_neighbors,
+            self.time_horizon,
+            self.time_horizon_obst,
+        )
+        if (
+            self.sim is not None
+            and self.sim.getNumAgents() != len(state.human_states) + 1
+        ):
             del self.sim
             self.sim = None
         if self.sim is None:
-            self.sim = rvo2.PyRVOSimulator(self.time_step, *params, self.radius, self.max_speed)
-            self.sim.addAgent(robot_state.position, *params, robot_state.radius + 0.01 + self.safety_space,
-                              robot_state.v_pref, robot_state.velocity)
+            self.sim = rvo2.PyRVOSimulator(
+                self.time_step, *params, self.radius, self.max_speed
+            )
+            self.sim.addAgent(
+                robot_state.position,
+                *params,
+                robot_state.radius + 0.01 + self.safety_space,
+                robot_state.v_pref,
+                robot_state.velocity
+            )
             for human_state in state.human_states:
-                self.sim.addAgent(human_state.position, *params, human_state.radius + 0.01 + self.safety_space,
-                                  self.max_speed, human_state.velocity)
+                self.sim.addAgent(
+                    human_state.position,
+                    *params,
+                    human_state.radius + 0.01 + self.safety_space,
+                    self.max_speed,
+                    human_state.velocity
+                )
+
+            if obstacles is not None:
+                # only add obstacle once when setting up
+                for (x_min, x_max, y_min, y_max) in obstacles:
+                    self.sim.addObstacle(
+                        [
+                            (x_max, y_min),
+                            (x_min, y_min),
+                            (x_min, y_max),
+                            (x_max, y_max),
+                        ]
+                    )
+                self.sim.processObstacles()
         else:
             self.sim.setAgentPosition(0, robot_state.position)
             self.sim.setAgentVelocity(0, robot_state.velocity)
@@ -103,7 +137,9 @@ class ORCA(Policy):
                 self.sim.setAgentVelocity(i + 1, human_state.velocity)
 
         # Set the preferred velocity to be a vector of unit magnitude (speed) in the direction of the goal.
-        velocity = np.array((robot_state.gx - robot_state.px, robot_state.gy - robot_state.py))
+        velocity = np.array(
+            (robot_state.gx - robot_state.px, robot_state.gy - robot_state.py)
+        )
         speed = np.linalg.norm(velocity)
         pref_vel = velocity / speed if speed > 1 else velocity
 
@@ -130,17 +166,29 @@ class CentralizedORCA(ORCA):
         super().__init__()
 
     def predict(self, state):
-        """ Centralized planning for all agents """
-        params = self.neighbor_dist, self.max_neighbors, self.time_horizon, self.time_horizon_obst
+        """Centralized planning for all agents"""
+        params = (
+            self.neighbor_dist,
+            self.max_neighbors,
+            self.time_horizon,
+            self.time_horizon_obst,
+        )
         if self.sim is not None and self.sim.getNumAgents() != len(state):
             del self.sim
             self.sim = None
 
         if self.sim is None:
-            self.sim = rvo2.PyRVOSimulator(self.time_step, *params, self.radius, self.max_speed)
+            self.sim = rvo2.PyRVOSimulator(
+                self.time_step, *params, self.radius, self.max_speed
+            )
             for agent_state in state:
-                self.sim.addAgent(agent_state.position, *params, agent_state.radius + 0.01 + self.safety_space,
-                                  self.max_speed, agent_state.velocity)
+                self.sim.addAgent(
+                    agent_state.position,
+                    *params,
+                    agent_state.radius + 0.01 + self.safety_space,
+                    self.max_speed,
+                    agent_state.velocity
+                )
         else:
             for i, agent_state in enumerate(state):
                 self.sim.setAgentPosition(i, agent_state.position)
@@ -148,12 +196,19 @@ class CentralizedORCA(ORCA):
 
         # Set the preferred velocity to be a vector of unit magnitude (speed) in the direction of the goal.
         for i, agent_state in enumerate(state):
-            velocity = np.array((agent_state.gx - agent_state.px, agent_state.gy - agent_state.py))
+            velocity = np.array(
+                (
+                    agent_state.gx - agent_state.px,
+                    agent_state.gy - agent_state.py,
+                )
+            )
             speed = np.linalg.norm(velocity)
             pref_vel = velocity / speed if speed > 1 else velocity
             self.sim.setAgentPrefVelocity(i, (pref_vel[0], pref_vel[1]))
 
         self.sim.doStep()
-        actions = [ActionXY(*self.sim.getAgentVelocity(i)) for i in range(len(state))]
+        actions = [
+            ActionXY(*self.sim.getAgentVelocity(i)) for i in range(len(state))
+        ]
 
         return actions

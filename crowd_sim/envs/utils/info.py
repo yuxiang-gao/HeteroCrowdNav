@@ -3,7 +3,7 @@ class Timeout(object):
         pass
 
     def __str__(self):
-        return 'Timeout'
+        return "Timeout"
 
 
 class ReachGoal(object):
@@ -11,7 +11,7 @@ class ReachGoal(object):
         pass
 
     def __str__(self):
-        return 'Reaching goal'
+        return "Reaching goal"
 
 
 class Discomfort(object):
@@ -19,7 +19,7 @@ class Discomfort(object):
         self.min_dist = min_dist
 
     def __str__(self):
-        return 'Discomfort'
+        return "Discomfort"
 
 
 class Collision(object):
@@ -27,7 +27,7 @@ class Collision(object):
         pass
 
     def __str__(self):
-        return 'Collision'
+        return "Collision"
 
 
 class Nothing(object):
@@ -35,4 +35,4 @@ class Nothing(object):
         pass
 
     def __str__(self):
-        return ''
+        return ""

@@ -1,4 +1,4 @@
-import collections
+from collections import UserDict, Mapping
 from pathlib import Path
 
 import toml
@@ -17,14 +17,14 @@ def dict_merge(dct, merge_dct):
         if (
             k in dct
             and isinstance(dct[k], dict)
-            and isinstance(merge_dct[k], collections.Mapping)
+            and isinstance(merge_dct[k], Mapping)
         ):
             dict_merge(dct[k], merge_dct[k])
         else:
             dct[k] = merge_dct[k]
 
 
-class Config(dict):
+class Config(UserDict):
     """
     Config class enables easy loading and getting config entries
     """
@@ -38,22 +38,24 @@ class Config(dict):
         ), "Config class takes a dict or toml file"
         super().__init__(config)
 
-    def __getitem__(self, key):
-        """Return Config rather than dict"""
-        val = dict.__getitem__(self, key)
-        if isinstance(val, dict):
-            val = Config(val)
-        return val
+    # def __getitem__(self, key):
+    #     """Return Config rather than dict"""
+    #     val = self.data[key]
+    #     if isinstance(val, dict):
+    #         val = Config(val)
+    #     return val
 
     def __call__(self, *argv):
         """Make class callable to easily get entries"""
         try:
-            output = self
+            output = self.data
             for arg in argv:
                 if not isinstance(output, dict):
-                    print("Too many args, return the closest entry.")
+                    print("Too many keys, return the closest entry.")
                     return output
                 output = output[arg]
+            if isinstance(output, dict):
+                output = Config(output)
             return output
         except KeyError as err:
             print(f"Config error {err}")
@@ -61,7 +63,7 @@ class Config(dict):
     def dump(self, config_output):
         """Dump dict to file"""
         with open(config_output, "w") as f:
-            toml.dump(dict(self), f)
+            toml.dump(self.data, f)
 
     def merge(self, merge_dct):
         """Recursive dict merge. Inspired by :meth:``dict.update()``, instead of
@@ -74,9 +76,9 @@ class Config(dict):
         for k, v in merge_dct.items():
             if (
                 k in self
-                and isinstance(self[k], dict)
-                and isinstance(merge_dct[k], collections.Mapping)
+                and isinstance(self.data[k], dict)
+                and isinstance(merge_dct[k], Mapping)
             ):
-                dict_merge(self[k], merge_dct[k])
+                dict_merge(self.data[k], merge_dct[k])
             else:
                 self[k] = merge_dct[k]

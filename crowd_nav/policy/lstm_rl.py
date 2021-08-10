@@ -105,7 +105,7 @@ class LstmRL(MultiHumanRL):
             )
         )
 
-    def predict(self, state):
+    def predict(self, state, obstacles=None):
         """
         Input state is the joint state of robot concatenated with the observable state of other agents
 

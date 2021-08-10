@@ -7,12 +7,12 @@ class Human(Agent):
         super().__init__(config, section)
         self.id = None
 
-    def act(self, ob):
+    def act(self, ob, groups=None):
         """
         The state for human is its full state and all other agents' observable states
         :param ob:
         :return:
         """
         state = JointState(self.get_full_state(), ob)
-        action = self.policy.predict(state)
+        action = self.policy.predict(state, groups, state.obstacles)
         return action
