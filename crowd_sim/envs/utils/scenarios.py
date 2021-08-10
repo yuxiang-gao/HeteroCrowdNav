@@ -209,6 +209,9 @@ class SceneManager(object):
     def get_obstacles(self):
         return self.scenario_manager.obstacles
 
+    def get_map_size(self):
+        return self.scenario_manager.map_size
+
     def spawn(
         self,
         num_human=5,

@@ -554,18 +554,25 @@ class CrowdSim(gym.Env):
         # plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
         x_offset = 0.2
         y_offset = 0.4
-        cmap = plt.cm.get_cmap("hsv", 10)
+        # cmap = plt.cm.get_cmap("hsv", 10)
+        cmap = plt.cm.get_cmap("tab20")
         robot_color = "black"
         arrow_style = patches.ArrowStyle("->", head_length=4, head_width=2)
         display_numbers = True
 
+        xlim, ylim = self.scene_manager.get_map_size()
+
         if mode == "traj":
             fig, ax = plt.subplots(figsize=(7, 7))
             ax.tick_params(labelsize=16)
-            ax.set_xlim(-5, 5)
-            ax.set_ylim(-5, 5)
+            ax.set_xlim(-xlim, xlim)
+            ax.set_ylim(-ylim, ylim)
             ax.set_xlabel("x(m)", fontsize=16)
             ax.set_ylabel("y(m)", fontsize=16)
+
+            # draw static obstacles
+            for ob in self.obstacles:
+                ax.plot(ob[:2], ob[2:4], "-o", color="black", markersize=2.5)
 
             # add human start positions and goals
             human_colors = [cmap(i) for i in range(len(self.humans))]
@@ -665,11 +672,15 @@ class CrowdSim(gym.Env):
         elif mode == "video":
             fig, ax = plt.subplots(figsize=(7, 7))
             ax.tick_params(labelsize=12)
-            ax.set_xlim(-11, 11)
-            ax.set_ylim(-11, 11)
+            ax.set_xlim(-xlim, xlim)
+            ax.set_ylim(-ylim, ylim)
             ax.set_xlabel("x(m)", fontsize=14)
             ax.set_ylabel("y(m)", fontsize=14)
             show_human_start_goal = False
+
+            # draw static obstacles
+            for ob in self.obstacles:
+                ax.plot(ob[:2], ob[2:4], "-o", color="black", markersize=2.5)
 
             # add human start positions and goals
             human_colors = [cmap(i) for i in range(len(self.humans))]
@@ -986,8 +997,8 @@ class CrowdSim(gym.Env):
                             print_feat()
                         if hasattr(self.robot.policy, "get_X"):
                             print_X()
-                        # if hasattr(self.robot.policy, 'action_values'):
-                        #    plot_value_heatmap()
+                        # if hasattr(self.robot.policy, "action_values"):
+                        #     plot_value_heatmap()
                 else:
                     anim.event_source.start()
                 anim.running ^= True

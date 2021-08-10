@@ -163,21 +163,26 @@ def main():
             ]
         )
 
+        logging.info(
+            "It takes %.2f seconds to finish. Final status is %s, cumulative_reward is %f",
+            env.global_time,
+            info,
+            cumulative_reward,
+        )
+
         if args.traj:
             env.render("traj", args.video_file)
         else:
             if args.video_dir is not None:
                 if policy_config.name == "gcn":
-                    args.video_file = os.path.join(
+                    args.video_file = Path(
                         args.video_dir,
                         policy_config.name
                         + "_"
                         + policy_config.gcn.similarity_function,
                     )
                 else:
-                    args.video_file = os.path.join(
-                        args.video_dir, policy_config.name
-                    )
+                    args.video_file = Path(args.video_dir, policy_config.name)
                 args.video_file = (
                     args.video_file
                     + "_"
@@ -187,12 +192,6 @@ def main():
                     + ".mp4"
                 )
             env.render("video", args.video_file)
-        logging.info(
-            "It takes %.2f seconds to finish. Final status is %s, cumulative_reward is %f",
-            env.global_time,
-            info,
-            cumulative_reward,
-        )
         if robot.visible and info == "reach goal":
             human_times = env.get_human_times()
             logging.info(
