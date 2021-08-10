@@ -17,7 +17,7 @@ class ValueNetwork(nn.Module):
         mlp2_dims,
         mlp3_dims,
         attention_dims,
-        action_space_size,  # action space size is speed_samples * rotation_samples + 1
+        action_space_size,
         with_global_state,
         cell_size,
         cell_num,
@@ -26,6 +26,7 @@ class ValueNetwork(nn.Module):
         self.self_state_dim = self_state_dim
         self.global_state_dim = mlp1_dims[-1]
         self.mlp1 = mlp(input_dim, mlp1_dims, last_relu=True)
+        self.last_mpl1 = mlp1_dims[-1]
         self.mlp2 = mlp(mlp1_dims[-1], mlp2_dims)
         self.with_global_state = with_global_state
         if with_global_state:
@@ -33,8 +34,8 @@ class ValueNetwork(nn.Module):
         else:
             self.attention = mlp(mlp1_dims[-1], attention_dims)
         self.attention_weights = None
-        # self.cell_size = cell_size
-        # self.cell_num = cell_num
+        self.cell_size = cell_size
+        self.cell_num = cell_num
         mlp3_input_dim = mlp2_dims[-1] + self.self_state_dim
         self.mlp3 = mlp(mlp3_input_dim, mlp3_dims, last_relu=True)
         self.lin_value = nn.Linear(mlp3_dims[-1], 1)
@@ -109,53 +110,6 @@ class ValueNetwork(nn.Module):
         values = self.lin_value(joint_state)
         return policies, values
 
-
-class HARL(MultiHumanRL):
-    def __init__(self):
-        super().__init__()
-        self.name = "HARL"
-
-        self.attention_weights = None
-
-    def configure(self, config):
-        self.set_common_parameters(config)
-        sarl_config = config["harl"]
-        mlp1_dims = sarl_config["mlp1_dims"]
-        mlp2_dims = sarl_config["mlp2_dims"]
-        attention_dims = sarl_config["attention_dims"]
-        mlp3_dims = sarl_config["mlp3_dims"]
-        action_space_size = (
-            config["action_space"]["speed_samples"]
-            * config["action_space"]["rotation_samples"]
-            + 1
-        )
-
-        self.with_om = sarl_config["with_om"]
-        self.multiagent_training = sarl_config["multiagent_training"]
-        with_global_state = sarl_config["with_global_state"]
-        self.model = ValueNetwork(
-            self.input_dim(),
-            self.self_state_dim,
-            mlp1_dims,
-            mlp2_dims,
-            mlp3_dims,
-            attention_dims,
-            action_space_size,
-            with_global_state,
-            self.cell_size,
-            self.cell_num,
-        )
-        if self.with_om:
-            self.name = "OM-HARL"
-        logging.info(
-            "Policy: {} {} global state".format(
-                self.name, "w/" if with_global_state else "w/o"
-            )
-        )
-
-    def get_attention_weights(self):
-        return self.model.attention_weights
-
     def forward_with_processing(self, state):
         """
         A base class for all methods that takes pairwise joint state as input to policy-value network.
@@ -202,3 +156,48 @@ class HARL(MultiHumanRL):
                 axis=1,
             )
         return policy, value, ob
+
+
+class HARL(MultiHumanRL):
+    def __init__(self):
+        super().__init__()
+        self.name = "HARL"
+        self.attention_weights = None
+
+    def configure(self, config):
+        self.set_common_parameters(config)
+        sarl_config = config["harl"]
+        mlp1_dims = sarl_config["mlp1_dims"]
+        mlp2_dims = sarl_config["mlp2_dims"]
+        attention_dims = sarl_config["attention_dims"]
+        mlp3_dims = sarl_config["mlp3_dims"]
+        action_space_size = (
+            config["action_space"]["speed_samples"]
+            * config["action_space"]["rotation_samples"]
+            + 1
+        )  # action space size is speed_samples * rotation_samples + 1
+        self.with_om = sarl_config["with_om"]
+        self.multiagent_training = sarl_config["multiagent_training"]
+        with_global_state = sarl_config["with_global_state"]
+        self.model = ValueNetwork(
+            self.input_dim(),
+            self.robot_state_dim,
+            mlp1_dims,
+            mlp2_dims,
+            mlp3_dims,
+            attention_dims,
+            action_space_size,
+            with_global_state,
+            self.cell_size,
+            self.cell_num,
+        )
+        if self.with_om:
+            self.name = "OM-HARL"
+        logging.info(
+            "Policy: {} {} global state".format(
+                self.name, "w/" if with_global_state else "w/o"
+            )
+        )
+
+    def get_attention_weights(self):
+        return self.model.attention_weights
