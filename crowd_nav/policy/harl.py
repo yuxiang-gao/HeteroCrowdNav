@@ -17,41 +17,40 @@ class ValueNetwork(nn.Module):
         mlp2_dims,
         mlp3_dims,
         attention_dims,
-        action_space_size, # action space size is speed_samples * rotation_samples + 1
+        action_space_size,  # action space size is speed_samples * rotation_samples + 1
         with_global_state,
         cell_size,
         cell_num,
     ):
         super().__init__()
-            self.self_state_dim = self_state_dim
-            self.global_state_dim = mlp1_dims[-1]
-            self.mlp1 = mlp(input_dim, mlp1_dims, last_relu=True)
-            self.mlp2 = mlp(mlp1_dims[-1], mlp2_dims)
-            self.with_global_state = with_global_state
-            if with_global_state:
-                self.attention = mlp(mlp1_dims[-1] * 2, attention_dims)
-            else:
-                self.attention = mlp(mlp1_dims[-1], attention_dims)
-            # self.cell_size = cell_size
-            # self.cell_num = cell_num
-            mlp3_input_dim = mlp2_dims[-1] + self.self_state_dim
-            self.mlp3 = mlp(mlp3_input_dim, mlp3_dims, last_relu=True)
-            self.attention_weights = None
-            # p_d = (
-            # int(config.get("action_space", "speed_samples"))
-            # * int(config.get("action_space", "rotation_samples"))
-            # + 1
-            # )
-            self.lin_value = nn.Linear(mlp3_dims[-1], 1)
+        self.self_state_dim = self_state_dim
+        self.global_state_dim = mlp1_dims[-1]
+        self.mlp1 = mlp(input_dim, mlp1_dims, last_relu=True)
+        self.mlp2 = mlp(mlp1_dims[-1], mlp2_dims)
+        self.with_global_state = with_global_state
+        if with_global_state:
+            self.attention = mlp(mlp1_dims[-1] * 2, attention_dims)
+        else:
+            self.attention = mlp(mlp1_dims[-1], attention_dims)
+        self.attention_weights = None
+        # self.cell_size = cell_size
+        # self.cell_num = cell_num
+        mlp3_input_dim = mlp2_dims[-1] + self.self_state_dim
+        self.mlp3 = mlp(mlp3_input_dim, mlp3_dims, last_relu=True)
+        self.lin_value = nn.Linear(mlp3_dims[-1], 1)
+        self.lin_policy = nn.Linear(mlp3_dims[-1], action_space_size)
 
-            self.lin_policy = nn.Linear(mlp3_dims[-1], action_space_size)
-    
-    def forward(self, state):
+    def forward(self, state_input):
         """
         First transform the world coordinates to self-centric coordinates and then do forward computation
         :param state: tensor of shape (batch_size, # of humans, length of a rotated state)
         :return:
         """
+        if isinstance(state_input, tuple):
+            state, lengths = state_input
+        else:
+            state = state_input
+            lengths = torch.IntTensor([state.size()[1]])
         size = state.shape
         self_state = state[:, 0, : self.self_state_dim]
         mlp1_output = self.mlp1(state.view((-1, size[2])))
@@ -125,7 +124,11 @@ class HARL(MultiHumanRL):
         mlp2_dims = sarl_config["mlp2_dims"]
         attention_dims = sarl_config["attention_dims"]
         mlp3_dims = sarl_config["mlp3_dims"]
-        action_space_size = config["action_space"]["speed_samples"] * config["action_space"]["rotation_samples"] + 1
+        action_space_size = (
+            config["action_space"]["speed_samples"]
+            * config["action_space"]["rotation_samples"]
+            + 1
+        )
 
         self.with_om = sarl_config["with_om"]
         self.multiagent_training = sarl_config["multiagent_training"]
