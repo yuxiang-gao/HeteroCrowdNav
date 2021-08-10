@@ -23,6 +23,8 @@ class Agent(object):
         )
         self.px = None
         self.py = None
+        self.sx = None
+        self.sy = None
         self.gx = None
         self.gy = None
         self.vx = None
@@ -51,6 +53,10 @@ class Agent(object):
         """
         self.v_pref = np.random.uniform(0.5, 1.5)
         self.radius = np.random.uniform(0.3, 0.5)
+
+    def go_back(self):
+        # reverse start and goal
+        self.set(self.gx, self.gy, self.sx, self.sy, 0, 0)
 
     def set(self, px, py, gx, gy, vx, vy, theta=None, radius=None, v_pref=None):
         self.px = px
@@ -83,8 +89,9 @@ class Agent(object):
             next_vx = action.vx
             next_vy = action.vy
         else:
-            next_vx = action.v * np.cos(self.theta)
-            next_vy = action.v * np.sin(self.theta)
+            next_theta = self.theta + action.r
+            next_vx = action.v * np.cos(next_theta)
+            next_vy = action.v * np.sin(next_theta)
         return ObservableState(next_px, next_py, next_vx, next_vy, self.radius)
 
     def get_full_state(self):
@@ -121,7 +128,7 @@ class Agent(object):
         self.vy = velocity[1]
 
     @abc.abstractmethod
-    def act(self, ob):
+    def act(self, ob, groups=None):
         """
         Compute state using received observation and pass it to policy
 

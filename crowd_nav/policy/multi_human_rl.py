@@ -8,7 +8,7 @@ class MultiHumanRL(CADRL):
     def __init__(self):
         super().__init__()
 
-    def predict(self, state):
+    def predict(self, state, obstacles=None):
         """
         A base class for all methods that takes pairwise joint state as input to value network.
         The input to the value network is always of shape (batch_size, # humans, rotated joint state length)

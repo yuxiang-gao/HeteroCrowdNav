@@ -10,7 +10,7 @@ from crowd_sim.envs.utils.state import JointState
 from crowd_sim.envs.utils.utils import line_distance
 
 
-class Scenario(Enum, str):
+class Scenario(str, Enum):
     CIRCLE_CROSSING = "circle_crossing"
     CORRIDOR = "corridor"
     LONG_CORRIDOR = "long_corridor"
@@ -42,6 +42,16 @@ class ScenarioManager(object):
         else:
             self.scenario = Scenario.find(scenario)
         self.configure(config)
+
+    def configure(self, config):
+        self.config = config
+        self.scenario_config = config("scenarios", self.scenario.value)
+        self.map_size = config(
+            "scenarios", "map_size"
+        )  # half width and height, assumed to be symmetric
+        self.v_pref = config("agents", "humans", "v_pref")
+        self.human_radius = config("agents", "humans", "radius")
+        self.discomfort_dist = config("reward", "discomfort_dist")
 
         if self.scenario == Scenario.CORNER:
             width = self.scenario_config("width")
@@ -96,16 +106,6 @@ class ScenarioManager(object):
                 [0, self.circle_radius],
             ]
 
-    def configure(self, config):
-        self.config = config
-        self.scenario_config = config(self.scenario.value)
-        self.map_size = config(
-            "map_size"
-        )  # half width and height, assumed to be symmetric
-        self.v_pref = config("agents", "humans", "v_pref")
-        self.human_radius = config("agents", "humans", "radius")
-        self.discomfort_dist = config("reward", "discomfort_dist")
-
     def get_robot_spawn_position(self):
         return self.robot_spawn_positions[0], self.robot_spawn_positions[1]
 
@@ -113,7 +113,7 @@ class ScenarioManager(object):
         if self.scenario == Scenario.CIRCLE_CROSSING:
             angle = self.rng.random() * np.pi * 2
             pos = self.circle_radius * np.array([np.cos(angle), np.sin(angle)])
-            return pos, -pos * 100
+            return pos, -pos
         # elif self.scenario == Scenario.LONG_CORRIDOR:
         #     return self.spawn_positions[0], self.spawn_positions[1]
         else:
@@ -222,7 +222,7 @@ class SceneManager(object):
         # Spawn robot
         if set_robot:
             start, goal = self.scenario_manager.get_robot_spawn_position()
-            logging.info(f"Spawn robot from {start} -> {goal}")
+            logging.debug(f"Spawn robot: {start} -> {goal}")
             self.spawn_robot(start, goal)
 
         if use_groups:
@@ -249,10 +249,16 @@ class SceneManager(object):
             center, goal = self.scenario_manager.get_spawn_positions(
                 group_sizes
             )
-            logging.info(
-                f"Spawn group {i} of size {size}, center: {center}, goal: {goal}"
-            )
+            if size > 1:
+                logging.debug(
+                    f"Spawn group {i} of size {size}, center: {center}, goal: {goal}"
+                )
+            else:
+                logging.debug(f"Spawn p{i}: {center} -> {goal}")
             self.humans += self.spawn_group(size, center, goal)
+
+        for i, human in enumerate(self.humans):
+            human.id = i
 
     def spawn_robot(self, start, goal):
         # noise = self.random_vector(length=(self.robot_radius * 2 + self.discomfort_dist))
@@ -310,7 +316,7 @@ class SceneManager(object):
                         length=self.human_radius
                     )  # gentlely nudge the new ped to avoid collision
 
-            human = Human(self.config, "humans")
+            human = Human(self.agent_config, "humans")
             if self.randomize_attributes:
                 human.sample_random_attributes()
             human.set(*spawn_pos, *goal, 0, 0)
@@ -362,6 +368,7 @@ class SceneManager(object):
         output_array = []
         idx = 0
         for s in split:
+            s = int(s)
             output_array.append(array[idx : idx + s])
             idx += s
         return np.array(output_array)

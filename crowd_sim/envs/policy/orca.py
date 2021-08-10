@@ -83,8 +83,6 @@ class ORCA(Policy):
         :param state:
         :return:
         """
-        if groups is not None:
-            raise NotImplementedError
 
         robot_state = state.robot_state
         params = (
