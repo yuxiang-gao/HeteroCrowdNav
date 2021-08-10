@@ -31,9 +31,25 @@ class Trainer(ABC):
     def update_target_model(self, target_model):
         self.target_model = copy.deepcopy(target_model)
 
-    @abstractmethod
-    def set_learning_rate(self, learning_rate):
-        pass
+    def set_learning_rate(self, learning_rate, epsilon=1e-08):
+        optimizers = {
+            "SGD": optim.Adam(
+                self.model.parameters(), lr=learning_rate, eps=epsilon
+            ),
+            "Adam": optim.SGD(
+                self.model.parameters(), lr=learning_rate, momentum=0.9
+            ),
+        }
+        self.optimizer = optimizers.get(self.optimizer_name)
+        logging.info(
+            "Lr: {}  with {} optimizer for parameters [{}]".format(
+                learning_rate,
+                " ".join(
+                    [name for name, param in self.model.named_parameters()]
+                ),
+                self.optimizer_name,
+            )
+        )
 
     @abstractmethod
     def optimize_epoch(self, num_epochs):
@@ -42,6 +58,60 @@ class Trainer(ABC):
     @abstractmethod
     def optimize_batch(self, num_batches, episode):
         pass
+
+
+class PPOTrainer(Trainer):
+    def __init__(
+        self, model, memory, device, batch_size, writer, optimizer_name="Adam"
+    ):
+        super().__init__(
+            model, memory, device, batch_size, writer, optimizer_name
+        )
+
+    def optimize_epoch(self, num_epochs):
+        if self.optimizer is None:
+            raise ValueError("Learning rate is not set!")
+        if self.data_loader is None:
+            self.data_loader = DataLoader(
+                self.memory, self.batch_size, shuffle=True
+            )
+        average_epoch_loss = 0
+        epoch_loop = tqdm(range(num_epochs), desc="Imitate", colour="blue")
+        for epoch in epoch_loop:
+            epoch_loss = 0
+            data_loop = tqdm(
+                self.data_loader,
+                desc=f"Epoch [{epoch}/{num_epochs}]",
+                colour="green",
+                leave=False,
+            )
+            for data in data_loop:
+                if len(data) == 4:  # regular
+                    inputs, values, _, _ = data
+                # elif len(data) = 6: # PPO
+                #     inputs
+                inputs = Variable(inputs)
+                values = Variable(values)
+
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, values)
+                loss.backward()
+                self.optimizer.step()
+                epoch_loss += loss.data.item()
+                # pbar.set_description(f"Epoch [{epoch}/{num_epochs}]")
+                data_loop.set_postfix(loss=loss.data.item())
+
+            average_epoch_loss = epoch_loss / len(self.memory)
+            self.writer.add_scalar(
+                "IL/average_epoch_loss", average_epoch_loss, epoch
+            )
+            epoch_loop.set_postfix(loss=average_epoch_loss)
+            logging.debug(
+                "Average loss in epoch %d: %.2E", epoch, average_epoch_loss
+            )
+
+        return average_epoch_loss
 
 
 class VNRLTrainer(Trainer):
@@ -60,24 +130,6 @@ class VNRLTrainer(Trainer):
         self.time_step = 0.25
         self.v_pref = 1
 
-    def set_learning_rate(self, learning_rate):
-        optimizers = {
-            "SGD": optim.Adam(self.model.parameters(), lr=learning_rate),
-            "Adam": optim.SGD(
-                self.model.parameters(), lr=learning_rate, momentum=0.9
-            ),
-        }
-        self.optimizer = optimizers.get(self.optimizer_name)
-        logging.info(
-            "Lr: {}  with {} optimizer for parameters [{}]".format(
-                learning_rate,
-                " ".join(
-                    [name for name, param in self.model.named_parameters()]
-                ),
-                self.optimizer_name,
-            )
-        )
-
     def optimize_epoch(self, num_epochs):
         if self.optimizer is None:
             raise ValueError("Learning rate is not set!")
@@ -86,16 +138,16 @@ class VNRLTrainer(Trainer):
                 self.memory, self.batch_size, shuffle=True
             )
         average_epoch_loss = 0
-        loop = tqdm(range(num_epochs), desc="Imitate", colour="blue")
-        for epoch in loop:
+        epoch_loop = tqdm(range(num_epochs), desc="Imitate", colour="blue")
+        for epoch in epoch_loop:
             epoch_loss = 0
-            pbar = tqdm(
+            data_loop = tqdm(
                 self.data_loader,
                 desc=f"Epoch [{epoch}/{num_epochs}]",
                 colour="green",
                 leave=False,
             )
-            for inputs, values, _, _ in pbar:
+            for inputs, values, _, _ in data_loop:
                 inputs = Variable(inputs)
                 values = Variable(values)
 
@@ -106,13 +158,13 @@ class VNRLTrainer(Trainer):
                 self.optimizer.step()
                 epoch_loss += loss.data.item()
                 # pbar.set_description(f"Epoch [{epoch}/{num_epochs}]")
-                pbar.set_postfix(loss=loss.data.item())
+                data_loop.set_postfix(loss=loss.data.item())
 
             average_epoch_loss = epoch_loss / len(self.memory)
             self.writer.add_scalar(
                 "IL/average_epoch_loss", average_epoch_loss, epoch
             )
-            loop.set_postfix(loss=average_epoch_loss)
+            epoch_loop.set_postfix(loss=average_epoch_loss)
             logging.debug(
                 "Average loss in epoch %d: %.2E", epoch, average_epoch_loss
             )
