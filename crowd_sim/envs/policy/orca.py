@@ -165,7 +165,7 @@ class CentralizedORCA(ORCA):
     def __init__(self):
         super().__init__()
 
-    def predict(self, state):
+    def predict(self, state, obstacles=None):
         """Centralized planning for all agents"""
         params = (
             self.neighbor_dist,
@@ -189,6 +189,18 @@ class CentralizedORCA(ORCA):
                     self.max_speed,
                     agent_state.velocity
                 )
+            if obstacles is not None:
+                # only add obstacle once when setting up
+                for (x_min, x_max, y_min, y_max) in obstacles:
+                    self.sim.addObstacle(
+                        [
+                            (x_max, y_min),
+                            (x_min, y_min),
+                            (x_min, y_max),
+                            (x_max, y_max),
+                        ]
+                    )
+                self.sim.processObstacles()
         else:
             for i, agent_state in enumerate(state):
                 self.sim.setAgentPosition(i, agent_state.position)
