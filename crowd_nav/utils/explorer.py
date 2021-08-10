@@ -98,18 +98,7 @@ class Explorer(object):
                         states, actions, rewards, imitation_learning
                     )
 
-            cumulative_rewards.append(
-                sum(
-                    [
-                        pow(
-                            self.gamma,
-                            t * self.robot.time_step * self.robot.v_pref,
-                        )
-                        * reward
-                        for t, reward in enumerate(rewards)
-                    ]
-                )
-            )
+            cumulative_rewards.append(self.calc_value(0, rewards))
 
             returns = []
             for step in range(len(rewards)):
@@ -196,8 +185,7 @@ class Explorer(object):
         if self.memory is None or self.gamma is None:
             raise ValueError("Memory or gamma value is not set!")
 
-        for i, state in enumerate(states[:-1]):
-            reward = rewards[i]
+        for i, (state, reward) in enumerate(zip(states[:-1], rewards[:-1])):
 
             # VALUE UPDATE
             if imitation_learning:
@@ -205,19 +193,7 @@ class Explorer(object):
                 state = self.target_policy.transform(state)
                 # value = pow(self.gamma, (len(states) - 1 - i) * self.robot.time_step * self.robot.v_pref)
                 next_state = self.target_policy.transform(states[i + 1])
-                value = sum(
-                    [
-                        pow(
-                            self.gamma,
-                            max(t - i, 0)
-                            * self.robot.time_step
-                            * self.robot.v_pref,
-                        )
-                        * reward
-                        * (1 if t >= i else 0)
-                        for t, reward in enumerate(rewards)
-                    ]
-                )
+                value = self.calc_value(i, rewards)
             else:
                 next_state = states[i + 1]
                 if i == len(states) - 1:
@@ -250,6 +226,21 @@ class Explorer(object):
             #     padding = torch.zeros((5 - human_num, feature_size))
             #     state = torch.cat([state, padding])
             self.memory.push((state, value, reward, next_state))
+
+    def calc_value(self, idx, rewards):
+        # optimal value function
+        value = sum(
+            [
+                pow(
+                    self.gamma,
+                    max(t - idx, 0) * self.robot.time_step * self.robot.v_pref,
+                )
+                * reward
+                * (1 if t >= idx else 0)
+                for t, reward in enumerate(rewards)
+            ]
+        )
+        return value
 
     def log(self, tag_prefix, global_step):
         sr, cr, time, reward, avg_return = self.statistics
