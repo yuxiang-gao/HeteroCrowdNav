@@ -635,6 +635,7 @@ class CrowdSim(gym.Env):
         robot_color = "black"
         arrow_style = patches.ArrowStyle("->", head_length=4, head_width=2)
         display_numbers = True
+        display_roles = True
 
         xlim, ylim = self.scene_manager.get_map_size()
 
@@ -843,11 +844,23 @@ class CrowdSim(gym.Env):
                     )
                     for i in range(len(self.humans))
                 ]
+            if display_roles:
+                human_roles = [
+                    plt.text(
+                        humans[i].center[0] - 3 * x_offset,
+                        humans[i].center[1] - 2 * y_offset,
+                        self.humans[i].role,
+                        color="black",
+                    )
+                    for i in range(len(self.humans))
+                ]
 
             for i, human in enumerate(humans):
                 ax.add_artist(human)
                 if display_numbers:
                     ax.add_artist(human_numbers[i])
+                if display_roles:
+                    ax.add_artist(human_roles[i])
 
             # add time annotation
             time = plt.text(
@@ -958,6 +971,13 @@ class CrowdSim(gym.Env):
                             (
                                 human.center[0] - x_offset,
                                 human.center[1] + y_offset,
+                            )
+                        )
+                    if display_roles:
+                        human_roles[i].set_position(
+                            (
+                                human.center[0] - 3 * x_offset,
+                                human.center[1] - 2 * y_offset,
                             )
                         )
                 for arrow in arrows:

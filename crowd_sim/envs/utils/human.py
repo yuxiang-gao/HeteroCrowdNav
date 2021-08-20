@@ -5,7 +5,7 @@ from crowd_sim.envs.utils.state import JointState
 class Human(Agent):
     def __init__(self, config, section, type_idx=0):
         super().__init__(config[section], type_idx)  # hack
-        self.type_name = config[section][type_idx].get("role")
+        self.role = config[section][type_idx].get("role")
         self.type_idx = type_idx
 
     def act(self, ob, groups=None):
