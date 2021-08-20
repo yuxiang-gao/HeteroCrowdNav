@@ -2,8 +2,8 @@ title = "Config file"
 
 [debug]
     [debug.env]
-    val_size = 1
-    test_size = 1
+    case_size.val = 1
+    case_size.test = 1
 
     [debug.train]
     train_episodes = 1
@@ -90,7 +90,7 @@ goal_radius = 0.3
         role = "guest"
         visible = true
         policy = "orca"
-        radius = 0.35
+        radius = 0.3
         v_pref = 1
         sensor = "coordinates"
 
@@ -98,7 +98,7 @@ goal_radius = 0.3
         [env.agents.robot]
         visible = false
         policy = "none"
-        radius = 0.3
+        radius = 0.35
         v_pref = 1
         sensor = "coordinates"
 
