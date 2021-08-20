@@ -32,7 +32,9 @@ def main():
     parser = argparse.ArgumentParser("Parse configuration file")
     parser.add_argument("--policy", type=str, default="cadrl")
     parser.add_argument("--tag", type=str)
-    parser.add_argument("--config", type=str, default="configs/configs.toml")
+    parser.add_argument(
+        "--config", type=str, default="configs/configs_hetero.toml"
+    )
     parser.add_argument("--output_dir", type=str, default="data/output")
     parser.add_argument("--overwrite", default=False, action="store_true")
     parser.add_argument("--weights", type=str)
@@ -252,13 +254,12 @@ def main():
         robot.policy.set_epsilon(epsilon)
 
         # sample k episodes into memory and optimize over the generated memory
-        with logging_redirect_tqdm():
-            explorer.run_k_episodes(
-                sample_episodes, "train", update_memory=True, episode=episode
-            )
-            explorer.log("train", episode)
+        explorer.run_k_episodes(
+            sample_episodes, "train", update_memory=True, episode=episode
+        )
+        explorer.log("train", episode)
 
-            trainer.optimize_batch(train_batches, episode)
+        trainer.optimize_batch(train_batches, episode)
 
         if episode % target_update_interval == 0:
             explorer.update_target_model(model)

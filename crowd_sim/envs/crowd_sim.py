@@ -80,7 +80,7 @@ class CrowdSim(gym.Env):
         self.current_scenario = None
         self.square_width = None
         self.circle_radius = None
-        self.human_num = None
+        self.human_num = []
         self.perpetual = None
         self.centralized_planning = None
         self.centralized_planner = None
@@ -128,6 +128,7 @@ class CrowdSim(gym.Env):
         self.initial_distance = None
         self.previous_distance = None
         self.use_groups = False
+        self.use_types = None
         self.time_penalty = 0.0
         self.human_times = None
 
@@ -136,6 +137,9 @@ class CrowdSim(gym.Env):
     def configure(self, config):
         self.config = config
         self.agent_config = config("agents")
+
+        self.use_groups = self.agent_config("use_groups")
+        self.use_types = self.agent_config("use_types")
 
         self.time_limit = config("time_limit")
         self.time_step = config("time_step")
@@ -157,7 +161,7 @@ class CrowdSim(gym.Env):
         self.perpetual = config("scenarios", "perpetual")
         self.human_num = config("scenarios", "human_num")
 
-        human_policy = self.agent_config("humans", "policy")
+        human_policy = self.agent_config("humans")[0]["policy"]
         if self.centralized_planning:
             self.centralized_planner = policy_factory[
                 "centralized_" + human_policy
@@ -188,12 +192,12 @@ class CrowdSim(gym.Env):
 
             if self.centralized_planning:
                 self.centralized_planner.force_vectors = np.zeros(
-                    (self.human_num + 1, 6, 2)
+                    (sum(self.human_num) + 1, 6, 2)
                 )
         else:
             raise NotImplementedError
         self.case_counter = {"train": 0, "test": 0, "val": 0}
-        logging.info("human number: {}".format(self.human_num))
+        logging.info("Human number: {}".format(self.human_num))
         if self.randomize_attributes:
             logging.info("Randomize human's radius and preferred speed")
         else:
@@ -238,7 +242,7 @@ class CrowdSim(gym.Env):
         }
         if self.case_counter[phase] >= 0:
             human_num = (
-                self.human_num if self.robot.policy.multiagent_training else 1
+                self.human_num if self.robot.policy.multiagent_training else [1]
             )
             seed = counter_offset[phase] + self.case_counter[phase]
             self.set_scene(self.phase_scenario[phase], seed)
@@ -246,6 +250,7 @@ class CrowdSim(gym.Env):
                 num_human=human_num,
                 set_robot=True,
                 use_groups=self.use_groups,
+                use_types=self.use_types,
                 group_sizes=None,
             )
             (
@@ -264,9 +269,10 @@ class CrowdSim(gym.Env):
             assert phase == "test"
             if self.case_counter[phase] == -1:
                 # for debugging purposes
-                self.human_num = 3
+                self.human_num = [3]
                 self.humans = [
-                    Human(self.config, "humans") for _ in range(self.human_num)
+                    Human(self.config, "humans")
+                    for _ in range(sum(self.human_num))
                 ]
                 self.humans[0].set(0, -6, 0, 5, 0, 0, np.pi / 2)
                 self.humans[1].set(-5, -5, -5, 5, 0, 0, np.pi / 2)
@@ -284,7 +290,7 @@ class CrowdSim(gym.Env):
         if hasattr(self.robot.policy, "action_values"):
             self.action_values = list()
         if hasattr(self.robot.policy, "get_attention_weights"):
-            self.attention_weights = [np.zeros(self.human_num)]
+            self.attention_weights = [np.zeros(sum(self.human_num))]
 
         # get current observation
         if self.robot.sensor == "coordinates":
@@ -732,7 +738,7 @@ class CrowdSim(gym.Env):
                             color=cmap(i),
                             ls="solid",
                         )
-                        for i in range(self.human_num)
+                        for i in range(sum(self.human_num))
                     ]
                     ax.add_artist(nav_direction)
                     for human_direction in human_directions:
@@ -862,7 +868,7 @@ class CrowdSim(gym.Env):
             # compute orientation in each step and use arrow to show the direction
             radius = self.robot.radius
             orientations = []
-            for i in range(self.human_num + 1):
+            for i in range(sum(self.human_num) + 1):
                 orientation = []
                 for state in self.states:
                     agent_state = state[0] if i == 0 else state[1][i - 1]
@@ -922,11 +928,11 @@ class CrowdSim(gym.Env):
                             .position
                             for step in range(self.robot.policy.planning_depth)
                         ]
-                        for i in range(self.human_num)
+                        for i in range(sum(self.human_num))
                     ]
                     human_future_positions.append(human_future_position)
 
-                for i in range(self.human_num):
+                for i in range(sum(self.human_num)):
                     circles = []
                     for j in range(self.robot.policy.planning_depth):
                         circle = plt.Circle(
@@ -957,7 +963,7 @@ class CrowdSim(gym.Env):
                 for arrow in arrows:
                     arrow.remove()
 
-                for i in range(self.human_num + 1):
+                for i in range(sum(self.human_num) + 1):
                     orientation = orientations[i]
                     if i == 0:
                         arrows = [

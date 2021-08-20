@@ -167,7 +167,9 @@ class VNRLTrainer(Trainer):
             )
             epoch_loop.set_postfix(loss=average_epoch_loss)
             logging_debug(
-                "Average loss in epoch %d: %.2E", epoch, average_epoch_loss
+                "Average loss in epoch %d: %.2E".format(
+                    epoch, average_epoch_loss
+                )
             )
 
         return average_epoch_loss
@@ -209,6 +211,6 @@ class VNRLTrainer(Trainer):
 
         average_loss = losses / num_batches
         self.writer.add_scalar("RL/average_loss", average_loss, episode)
-        logging_debug("Average loss : %.2E", average_loss)
+        logging_debug("Average loss : %.2E".format(average_loss))
 
         return average_loss
