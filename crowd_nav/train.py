@@ -62,7 +62,7 @@ def main():
     )  # make a new output dir for each policy
     config_dir = Path(args.config)
     config_output = Path(
-        output_dir, config_dir.name
+        output_dir, "configs.toml"  # config_dir.name
     )  # location to store config in output dir
     if args.resume:
         if config_output.exists():
