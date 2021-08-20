@@ -7,7 +7,7 @@ from numpy.linalg import norm
 
 from crowd_sim.envs.utils.human import Human
 from crowd_sim.envs.utils.state import JointState
-from crowd_sim.envs.utils.utils import line_distance
+from crowd_sim.envs.utils.utils import line_distance, logging_debug
 
 
 class Scenario(str, Enum):
@@ -225,7 +225,7 @@ class SceneManager(object):
         # Spawn robot
         if set_robot:
             start, goal = self.scenario_manager.get_robot_spawn_position()
-            logging.debug(f"Spawn robot: {start} -> {goal}")
+            logging_debug(f"Spawn robot: {start} -> {goal}")
             self.spawn_robot(start, goal)
 
         if use_groups:
@@ -253,11 +253,11 @@ class SceneManager(object):
                 group_sizes
             )
             if size > 1:
-                logging.debug(
+                logging_debug(
                     f"Spawn group {i} of size {size}, center: {center}, goal: {goal}"
                 )
             else:
-                logging.debug(f"Spawn p{i}: {center} -> {goal}")
+                logging_debug(f"Spawn p{i}: {center} -> {goal}")
             self.humans += self.spawn_group(size, center, goal)
 
         for i, human in enumerate(self.humans):

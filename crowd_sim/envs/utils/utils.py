@@ -1,5 +1,13 @@
+import logging
 import numpy as np
 from math import sqrt
+
+from tqdm.contrib.logging import logging_redirect_tqdm
+
+
+def logging_debug(msg):
+    with logging_redirect_tqdm():
+        logging.debug(msg)
 
 
 def point_to_segment_dist(x1, y1, x2, y2, x3, y3):

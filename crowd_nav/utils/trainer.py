@@ -9,6 +9,7 @@ from torch.optim import optimizer
 from torch.utils.data import DataLoader
 
 from tqdm import tqdm
+from crowd_sim.envs.utils.utils import logging_debug
 
 
 class Trainer(ABC):
@@ -107,7 +108,7 @@ class PPOTrainer(Trainer):
                 "IL/average_epoch_loss", average_epoch_loss, epoch
             )
             epoch_loop.set_postfix(loss=average_epoch_loss)
-            logging.debug(
+            logging_debug(
                 "Average loss in epoch %d: %.2E", epoch, average_epoch_loss
             )
 
@@ -165,7 +166,7 @@ class VNRLTrainer(Trainer):
                 "IL/average_epoch_loss", average_epoch_loss, epoch
             )
             epoch_loop.set_postfix(loss=average_epoch_loss)
-            logging.debug(
+            logging_debug(
                 "Average loss in epoch %d: %.2E", epoch, average_epoch_loss
             )
 
@@ -208,6 +209,6 @@ class VNRLTrainer(Trainer):
 
         average_loss = losses / num_batches
         self.writer.add_scalar("RL/average_loss", average_loss, episode)
-        logging.debug("Average loss : %.2E", average_loss)
+        logging_debug("Average loss : %.2E", average_loss)
 
         return average_loss

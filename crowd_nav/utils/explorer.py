@@ -47,6 +47,7 @@ class Explorer(object):
         timeout_times = []
         success = 0
         collision = 0
+        obs_collision = 0
         timeout = 0
         discomfort = 0
         min_dist = []
@@ -55,12 +56,19 @@ class Explorer(object):
         collision_cases = []
         timeout_cases = []
 
-        if k != 1:
-            pbar = tqdm(total=k, desc=f"Explore [{phase.upper()}]", leave=False)
-        else:
-            pbar = None
+        episode_info_record = []
 
-        for i in range(k):
+        if k != 1:
+            pbar = tqdm(
+                range(k),
+                total=k,
+                desc=f"Explore [{phase.upper()}]",
+                leave=False,
+            )
+        else:
+            pbar = range(k)
+
+        for i in pbar:
             ob = self.env.reset(phase)
             done = False
             states = []
@@ -88,6 +96,27 @@ class Explorer(object):
                 timeout += 1
                 timeout_cases.append(i)
                 timeout_times.append(self.env.time_limit)
+
+            if isinstance(info, dict):
+                episode_info_record.append(info)
+                if info["events"]["succeed"]:
+                    success += 1
+                    success_times.append(self.env.global_time)
+                elif info["events"]["collision"]:
+                    collision += 1
+                    collision_cases.append(i)
+                    collision_times.append(self.env.global_time)
+                elif info["events"]["obstacle_collision"]:
+                    obs_collision += 1
+                elif info["events"]["timeout"]:
+                    timeout += 1
+                    timeout_cases.append(i)
+                    timeout_times.append(self.env.time_limit)
+                # success += info["events"]["succeed"]
+                # collision += info["events"]["collision"]
+                # obs_collision += info["events"]["obstacle_collision"]
+                # timeout += info["events"]["timeout"]
+
             else:
                 raise ValueError("Invalid end signal from environment")
 
@@ -97,6 +126,15 @@ class Explorer(object):
                     self.update_memory(
                         states, actions, rewards, imitation_learning
                     )
+                if isinstance(info, dict):
+                    if (
+                        info["events"]["succeed"]
+                        or info["events"]["collision"]
+                        or info["events"]["obstacle_collision"]
+                    ):
+                        self.update_memory(
+                            states, actions, rewards, imitation_learning
+                        )
 
             cumulative_rewards.append(self.calc_value(0, rewards))
 
@@ -115,16 +153,15 @@ class Explorer(object):
                 returns.append(step_return)
             average_returns.append(average(returns))
 
-            if pbar:
-                pbar.update(1)
+            if k > 1:
                 pbar.set_postfix(
                     reward=cumulative_rewards[-1],
                     avg_return=average_returns[-1],
                 )
 
         success_rate = success / k
-        collision_rate = collision / k
-        assert success + collision + timeout == k
+        collision_rate = (collision + obs_collision) / k
+        assert success + collision + obs_collision + timeout == k
         avg_nav_time = (
             sum(success_times) / len(success_times)
             if success_times
@@ -244,12 +281,16 @@ class Explorer(object):
 
     def log(self, tag_prefix, global_step):
         sr, cr, time, reward, avg_return = self.statistics
-        self.writer.add_scalar(tag_prefix + "/success_rate", sr, global_step)
-        self.writer.add_scalar(tag_prefix + "/collision_rate", cr, global_step)
         self.writer.add_scalar(tag_prefix + "/time", time, global_step)
-        self.writer.add_scalar(tag_prefix + "/reward", reward, global_step)
-        self.writer.add_scalar(
-            tag_prefix + "/avg_return", avg_return, global_step
+        self.writer.add_scalars(
+            tag_prefix + "/performance",
+            {"success_rate": sr, "collision_rate": cr},
+            global_step,
+        )
+        self.writer.add_scalars(
+            tag_prefix + "/rewards",
+            {"rewards": reward, "returns": avg_return},
+            global_step,
         )
 
 

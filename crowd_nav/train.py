@@ -9,8 +9,7 @@ import torch
 import gym
 import git
 from tqdm import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 from crowd_sim.envs.utils.config import Config
 from crowd_sim.envs.utils.robot import Robot
