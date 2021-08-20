@@ -167,7 +167,9 @@ class VNRLTrainer(Trainer):
             )
             epoch_loop.set_postfix(loss=average_epoch_loss)
             logging_debug(
-                "Average loss in epoch %d: %.2E", epoch, average_epoch_loss
+                "Average loss in epoch %d: %.2E".format(
+                    epoch, average_epoch_loss
+                )
             )
 
         return average_epoch_loss

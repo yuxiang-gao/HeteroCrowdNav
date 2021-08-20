@@ -51,7 +51,9 @@ class Config(UserDict):
             output = self.data
             for arg in argv:
                 if not isinstance(output, dict):
-                    print("Too many keys, return the closest entry.")
+                    print(
+                        f"Too many keys, return the closest entry: {argv} - {arg}"
+                    )
                     return output
                 output = output[arg]
             if isinstance(output, dict):

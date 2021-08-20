@@ -16,12 +16,26 @@ class Scenario(str, Enum):
     LONG_CORRIDOR = "long_corridor"
     CORNER = "corner"
     T_INTERSECTION = "t_intersection"
+    COCKTAIL_PARTY = "cocktail_party"
 
     @classmethod
     def find(cls, name):
         for i in cls:
             if name in i.value:
                 return i
+
+
+def convert_polygon(square_corners):
+    """
+    Convert corners of a polygon to lines: x1,x2,y1,y2
+    """
+    lines = []
+    length = len(square_corners)
+    for i in range(length):
+        c1 = square_corners[i]
+        c2 = square_corners[(i + 1) % length]
+        lines.append([c1[0], c2[0], c1[1], c2[1]])
+    return lines
 
 
 class ScenarioManager(object):
@@ -33,7 +47,7 @@ class ScenarioManager(object):
         self.config = None
         self.scenario_config = None
         self.map_size = None
-        self.obstacles = []
+        self.obstacles = []  # x_min,x_max, y_min, y_max
         self.spawn_positions = []
 
         self.rng = np.random.default_rng(seed)
@@ -49,8 +63,8 @@ class ScenarioManager(object):
         self.map_size = config(
             "scenarios", "map_size"
         )  # half width and height, assumed to be symmetric
-        self.v_pref = config("agents", "humans", "v_pref")
-        self.human_radius = config("agents", "humans", "radius")
+        self.v_pref = config("agents", "humans")[0].get("v_pref")
+        self.human_radius = config("agents", "humans")[0]["radius"]
         self.discomfort_dist = config("reward", "discomfort_dist")
 
         if self.scenario == Scenario.CORNER:
@@ -105,15 +119,58 @@ class ScenarioManager(object):
                 [0, -self.circle_radius],
                 [0, self.circle_radius],
             ]
+        elif self.scenario == Scenario.COCKTAIL_PARTY:
+            table_placement = np.array(self.scenario_config("table_placement"))
+            table_shape = np.array(self.scenario_config("table_shape"))
+            self.table_radius = self.scenario_config("table_radius")
+            table_scale = self.scenario_config("table_scale")
+            self.circle_radius = self.scenario_config("circle_radius")
+            table_centers = table_placement * table_scale
+
+            for center in table_centers:
+                self.obstacles += convert_polygon(
+                    center + table_shape * self.table_radius / np.sqrt(2)
+                )
+
+            self.guest_spawn_positions = table_centers
 
     def get_robot_spawn_position(self):
-        return self.robot_spawn_positions[0], self.robot_spawn_positions[1]
+        if self.scenario == Scenario.COCKTAIL_PARTY:
+            return self.sample_pos_goal_on_circle(
+                self.circle_radius, np.pi, noise=np.pi / 36
+            )  # 5deg noise
+        else:
+            return self.robot_spawn_positions[0], self.robot_spawn_positions[1]
 
-    def get_spawn_position(self):  # return (center, goal), no noise
+    def get_spawn_position(
+        self, type_idx=None
+    ):  # return (center, goal), no noise
         if self.scenario == Scenario.CIRCLE_CROSSING:
-            angle = self.rng.random() * np.pi * 2
-            pos = self.circle_radius * np.array([np.cos(angle), np.sin(angle)])
-            return pos, -pos
+            return self.sample_pos_goal_on_circle(
+                self.circle_radius, np.pi * 2, noise=np.pi / 36
+            )
+        if self.scenario == Scenario.COCKTAIL_PARTY:
+            if type_idx == 1:  # "guest"
+                offset_margin = 0.4
+                offset = np.array(
+                    [
+                        self.sample_pos_goal_on_circle(
+                            self.table_radius + offset_margin, np.pi * 2
+                        )[0],
+                        self.sample_pos_goal_on_circle(
+                            self.table_radius + offset_margin, np.pi * 2
+                        )[0],
+                    ]
+                )
+                return offset + self.rng.choice(
+                    self.guest_spawn_positions, size=2, replace=False
+                )
+
+            elif type_idx == 0:  # "waiter"
+                # generate waiter on circle
+                return self.sample_pos_goal_on_circle(
+                    self.circle_radius, np.pi * 2, noise=np.pi / 36
+                )
         # elif self.scenario == Scenario.LONG_CORRIDOR:
         #     return self.spawn_positions[0], self.spawn_positions[1]
         else:
@@ -125,9 +182,12 @@ class ScenarioManager(object):
                 self.spawn_positions[goal_idx],
             )
 
-    def get_spawn_positions(self, groups=None):
-        if self.scenario == Scenario.CIRCLE_CROSSING:
-            return self.get_spawn_position()
+    def get_spawn_positions(self, groups=None, type_idx=None):
+        if (
+            self.scenario == Scenario.CIRCLE_CROSSING
+            or self.scenario == Scenario.COCKTAIL_PARTY
+        ):
+            return self.get_spawn_position(type_idx=type_idx)
         else:
             # num_human = sum(groups)
             # average_human = num_human / len(self.spawn_positions)  # avg human per spawn pos
@@ -152,6 +212,16 @@ class ScenarioManager(object):
         z[z > threshold] = 0
         return z
 
+    def sample_pos_goal_on_circle(self, radius, angular_range, noise=None):
+        angle = self.rng.random() * angular_range
+        pos = radius * np.array([np.cos(angle), np.sin(angle)])
+        if noise is not None:
+            angle += (self.rng.random() - 0.5) * noise
+            goal = -radius * np.array([np.cos(angle), np.sin(angle)])
+        else:
+            goal = -pos
+        return pos, goal
+
 
 class SceneManager(object):
     def __init__(self, scenario, robot, config, seed):
@@ -171,7 +241,7 @@ class SceneManager(object):
     def configure(self, config):
         self.config = config
         self.agent_config = config("agents")
-        self.human_radius = self.agent_config("humans", "radius")
+        self.human_radius = self.agent_config("humans")[0]["radius"]
         self.robot_radius = self.agent_config("robot", "radius")
         self.discomfort_dist = self.config("reward", "discomfort_dist")
         self.randomize_attributes = self.config("randomize_attributes")
@@ -214,9 +284,10 @@ class SceneManager(object):
 
     def spawn(
         self,
-        num_human=5,
+        num_human=[5],
         group_size_lambda=1.2,
         use_groups=False,
+        use_types=False,
         set_robot=True,
         group_sizes=None,
     ):
@@ -225,7 +296,9 @@ class SceneManager(object):
         # Spawn robot
         if set_robot:
             start, goal = self.scenario_manager.get_robot_spawn_position()
-            logging_debug(f"Spawn robot: {start} -> {goal}")
+            logging_debug(
+                f"[{self.scenario_manager.scenario.value}] Spawn robot: {start} -> {goal}"
+            )
             self.spawn_robot(start, goal)
 
         if use_groups:
@@ -243,25 +316,44 @@ class SceneManager(object):
                         else:
                             group_sizes.append(size)
                 logging.info(f"Generating groups of size: {group_sizes}")
-        else:
-            group_sizes = np.ones(num_human)
-        human_idx = np.arange(num_human)
-        self.membership = self.split_array(human_idx, group_sizes)
+            # else:
+            #     group_sizes = np.ones(num_human)
+            human_idx = np.arange(sum(num_human))
+            self.membership = self.split_array(human_idx, group_sizes)
 
-        for i, size in enumerate(group_sizes):
-            center, goal = self.scenario_manager.get_spawn_positions(
-                group_sizes
-            )
-            if size > 1:
-                logging_debug(
-                    f"Spawn group {i} of size {size}, center: {center}, goal: {goal}"
+            for i, size in enumerate(group_sizes):
+                center, goal = self.scenario_manager.get_spawn_positions(
+                    group_sizes
                 )
-            else:
-                logging_debug(f"Spawn p{i}: {center} -> {goal}")
-            self.humans += self.spawn_group(size, center, goal)
+                if size > 1:
+                    logging_debug(
+                        f"Spawn group {i} of size {size}, center: {center}, goal: {goal}"
+                    )
+                else:
+                    logging_debug(f"Spawn p{i}: {center} -> {goal}")
+                self.humans += self.spawn_group(size, center, goal)
 
-        for i, human in enumerate(self.humans):
-            human.id = i
+            for i, human in enumerate(self.humans):
+                human.id = i
+        elif use_types:
+            if not isinstance(num_human, list):
+                raise TypeError(
+                    "num_human must be a list of num for each type."
+                )
+            for type_idx, type_size in enumerate(num_human):
+                for i, size in enumerate(range(type_size)):
+                    center, goal = self.scenario_manager.get_spawn_positions(
+                        type_idx=type_idx
+                    )
+                    self.humans += self.spawn_group(
+                        1, center, goal, type_idx=type_idx
+                    )
+                    logging_debug(
+                        f"[{self.scenario_manager.scenario.value}] Spawn p{i} of type {type_idx}: {center} -> {goal}"
+                    )
+
+            for i, human in enumerate(self.humans):
+                human.id = i
 
     def spawn_robot(self, start, goal):
         # noise = self.random_vector(length=(self.robot_radius * 2 + self.discomfort_dist))
@@ -305,7 +397,7 @@ class SceneManager(object):
             if len(humans) == size:
                 return humans
 
-    def spawn_group(self, size, center, goal):
+    def spawn_group(self, size, center, goal, type_idx=None):
         humans = []
         while True:
             spawn_pos = center
@@ -319,7 +411,7 @@ class SceneManager(object):
                         length=self.human_radius
                     )  # gentlely nudge the new ped to avoid collision
 
-            human = Human(self.agent_config, "humans")
+            human = Human(self.agent_config, "humans", type_idx)
             if self.randomize_attributes:
                 human.sample_random_attributes()
             human.set(*spawn_pos, *goal, 0, 0)
