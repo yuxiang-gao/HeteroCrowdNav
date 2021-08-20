@@ -166,7 +166,7 @@ def main():
         logging.info(
             "It takes %.2f seconds to finish. Final status is %s, cumulative_reward is %f",
             env.global_time,
-            info,
+            info["events"],
             cumulative_reward,
         )
 

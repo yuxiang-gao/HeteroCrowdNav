@@ -46,7 +46,7 @@ goal_radius = 0.3
     map_size = [10, 10]
 
         [env.scenarios.cocktail_party]
-        table_radius = 0.5
+        table_radius = 1
         table_scale = 4
         table_shape = [[-1,1],[-1,-1],[1,-1],[1,1]]
         table_placement = [[-1,1],[-1,-1],[1,-1],[1,1]]
@@ -82,8 +82,8 @@ goal_radius = 0.3
         role = "waiter"
         visible = true
         policy = "orca"
-        radius = 0.3
-        v_pref = 1
+        radius = 0.35
+        v_pref = 1.2
         sensor = "coordinates"
 
         [[env.agents.humans]]

@@ -377,7 +377,7 @@ class CrowdSim(gym.Env):
             human_actions = []
             for human in self.humans:
                 # Choose new target if human has reached goal and in perpetual mode:
-                if human.reached_destination() and self.perpetual:
+                if human.reached_destination(0.3) and self.perpetual:
                     human.go_back()
                 human_ob = self.compute_observation_for(human)
                 human_actions.append(human.act(human_ob, self.group_membership))
