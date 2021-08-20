@@ -57,7 +57,7 @@ class ORCA(Policy):
         self.trainable = False
         self.multiagent_training = True
         self.kinematics = "holonomic"
-        self.safety_space = 0.2
+        self.safety_space = 0.1
         self.neighbor_dist = 10
         self.max_neighbors = 10
         self.time_horizon = 5
@@ -65,14 +65,19 @@ class ORCA(Policy):
         self.radius = 0.3
         self.max_speed = 1
         self.sim = None
+        self.randomize_attributes = False
 
     def configure(self, config):
+        self.randomize_attributes = config["randomize_attributes"]
+        if self.randomize_attributes:
+            self.neighbor_dist = np.random.uniform(2, 20)
+            self.time_horizon = np.random.uniform(0.1, 5)
         return
 
     def set_phase(self, phase):
         return
 
-    def predict(self, state, groups=None, obstacles=None):
+    def predict(self, state, groups=None, obstacles=None, polygons=None):
         """
         Create a rvo2 simulation at each time step and run one step
         Python-RVO2 API: https://github.com/sybrenstuvel/Python-RVO2/blob/master/src/rvo2.pyx
@@ -116,10 +121,15 @@ class ORCA(Policy):
                     self.max_speed,
                     human_state.velocity
                 )
-
-            if obstacles is not None:
+            if polygons is not None:
+                for poly in polygons:
+                    self.sim.addObstacle(list(poly))
+                self.sim.processObstacles()
+            elif obstacles is not None:
                 # only add obstacle once when setting up
-                for (x_min, x_max, y_min, y_max) in obstacles:
+                for (x_1, x_2, y_1, y_2) in obstacles:
+                    x_min, x_max = sorted([x_1, x_2])
+                    y_min, y_max = sorted([y_1, y_2])
                     self.sim.addObstacle(
                         [
                             (x_max, y_min),
@@ -165,7 +175,7 @@ class CentralizedORCA(ORCA):
     def __init__(self):
         super().__init__()
 
-    def predict(self, state, obstacles=None):
+    def predict(self, state, obstacles=None, polygons=None):
         """Centralized planning for all agents"""
         params = (
             self.neighbor_dist,
@@ -189,9 +199,15 @@ class CentralizedORCA(ORCA):
                     self.max_speed,
                     agent_state.velocity
                 )
-            if obstacles is not None:
+            if polygons is not None:
+                for poly in polygons:
+                    self.sim.addObstacle(list(poly))
+                self.sim.processObstacles()
+            elif obstacles is not None:
                 # only add obstacle once when setting up
-                for (x_min, x_max, y_min, y_max) in obstacles:
+                for (x_1, x_2, y_1, y_2) in obstacles:
+                    x_min, x_max = sorted([x_1, x_2])
+                    y_min, y_max = sorted([y_1, y_2])
                     self.sim.addObstacle(
                         [
                             (x_max, y_min),

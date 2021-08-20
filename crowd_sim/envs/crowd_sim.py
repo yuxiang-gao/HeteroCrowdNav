@@ -715,7 +715,7 @@ class CrowdSim(gym.Env):
                             color="black",
                             fontsize=14,
                         )
-                        for i in range(self.human_num + 1)
+                        for i in range(sum(self.human_num) + 1)
                     ]
                     for time in times:
                         ax.add_artist(time)
@@ -753,7 +753,7 @@ class CrowdSim(gym.Env):
             ax.set_ylim(-ylim, ylim)
             ax.set_xlabel("x(m)", fontsize=14)
             ax.set_ylabel("y(m)", fontsize=14)
-            show_human_start_goal = False
+            show_human_start_goal = True
 
             # draw static obstacles
             for ob in self.obstacles:

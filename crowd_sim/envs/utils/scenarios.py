@@ -48,6 +48,7 @@ class ScenarioManager(object):
         self.scenario_config = None
         self.map_size = None
         self.obstacles = []  # x_min,x_max, y_min, y_max
+        self.polygon_obstacles = None
         self.spawn_positions = []
 
         self.rng = np.random.default_rng(seed)
@@ -121,17 +122,23 @@ class ScenarioManager(object):
                 [0, self.circle_radius],
             ]
         elif self.scenario == Scenario.COCKTAIL_PARTY:
-            table_placement = np.array(self.scenario_config("table_placement"))
-            table_shape = np.array(self.scenario_config("table_shape"))
+            table_placement = np.array(
+                self.scenario_config("table_placement")
+            ).astype("float64")
+            table_shape = np.array(self.scenario_config("table_shape")).astype(
+                "float64"
+            )
             self.table_radius = self.scenario_config("table_radius")
             table_scale = self.scenario_config("table_scale")
             self.circle_radius = self.scenario_config("circle_radius")
             table_centers = table_placement * table_scale
 
+            self.polygon_obstacles = []
             for center in table_centers:
-                self.obstacles += convert_polygon(
+                self.polygon_obstacles.append(
                     center + table_shape * self.table_radius / np.sqrt(2)
                 )
+                self.obstacles += convert_polygon(self.polygon_obstacles[-1])
 
             self.guest_spawn_positions = table_centers
 
@@ -152,20 +159,21 @@ class ScenarioManager(object):
             )
         if self.scenario == Scenario.COCKTAIL_PARTY:
             if type_idx == 1:  # "guest"
+                start, goal = self.rng.choice(
+                    self.guest_spawn_positions,
+                    size=2,
+                    replace=False,
+                )
                 offset_margin = 0.4
-                offset = np.array(
-                    [
-                        self.sample_pos_goal_on_circle(
-                            self.table_radius + offset_margin, np.pi * 2
-                        )[0],
-                        self.sample_pos_goal_on_circle(
-                            self.table_radius + offset_margin, np.pi * 2
-                        )[0],
-                    ]
+                start += np.array(
+                    self.sample_pos_goal_on_circle(
+                        self.table_radius + offset_margin, np.pi * 2
+                    )[0]
                 )
-                return offset + self.rng.choice(
-                    self.guest_spawn_positions, size=2, replace=False
-                )
+                vec = np.asarray(start - goal)
+                vec = vec / norm(vec)
+                goal += vec * (self.table_radius + offset_margin)
+                return start, goal
 
             elif type_idx == 0:  # "waiter"
                 # generate waiter on circle
@@ -258,6 +266,7 @@ class SceneManager(object):
         self.scenario_manager = ScenarioManager(scenario, self.config, seed)
         # pass obstacles to Agent class
         JointState.set_obstacles(self.get_obstacles())
+        JointState.polygon_obstacles = self.scenario_manager.polygon_obstacles
         self.rng = np.random.default_rng(seed=seed)
         # self.obstacles_sampled = self.sample_obstalces(self.get_obstacles())
 

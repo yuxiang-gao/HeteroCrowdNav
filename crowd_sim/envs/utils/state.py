@@ -89,7 +89,8 @@ class ObservableState(object):
 
 
 class JointState(object):
-    obstacles = []
+    obstacles = None
+    polygon_obstacles = None
 
     def __init__(self, robot_state, human_states):
         assert isinstance(robot_state, FullState)
