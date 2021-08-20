@@ -63,8 +63,9 @@ class ScenarioManager(object):
         self.map_size = config(
             "scenarios", "map_size"
         )  # half width and height, assumed to be symmetric
-        self.v_pref = config("agents", "humans")[0].get("v_pref")
-        self.human_radius = config("agents", "humans")[0]["radius"]
+        # self.v_pref = config("agents", "humans")[0].get("v_pref")
+        # for human in self.agent_config("humans"):
+        #     self.human_radius.append(human["radius"])
         self.discomfort_dist = config("reward", "discomfort_dist")
 
         if self.scenario == Scenario.CORNER:
@@ -241,7 +242,9 @@ class SceneManager(object):
     def configure(self, config):
         self.config = config
         self.agent_config = config("agents")
-        self.human_radius = self.agent_config("humans")[0]["radius"]
+        self.human_radius = []
+        for human in self.agent_config("humans"):
+            self.human_radius.append(human["radius"])
         self.robot_radius = self.agent_config("robot", "radius")
         self.discomfort_dist = self.config("reward", "discomfort_dist")
         self.randomize_attributes = self.config("randomize_attributes")
@@ -368,34 +371,34 @@ class SceneManager(object):
         #         )  # gentlely nudge the new ped to avoid collision
         self.robot.set(*start, *goal, 0, 0)
 
-    def spawn_group_with_form(
-        self, size, center, goal, form=[[1, 0], [0, 0.25], [0, -0.25]]
-    ):
-        humans = []
-        while True:
-            spawn_pos = np.asarray(center) + np.asarray(form)
-            while True:
-                collision = False
-                for pos in spawn_pos:
-                    if self.check_collision(
-                        pos, humans
-                    ):  # break if there is no collision
-                        collision = True
-                if collision:
-                    spawn_pos += self.random_vector(
-                        length=self.human_radius
-                    )  # gentlely nudge the new ped to avoid collision
-                else:
-                    break
-            for pos in spawn_pos:
-                human = Human(self.config, "humans")
-                if self.randomize_attributes:
-                    human.sample_random_attributes()
-                human.set(*pos, *goal, 0, 0)
-                humans.append(human)
-            # logging.info(f"spawn humans at {spawn_pos}, {len(humans)},{size}")
-            if len(humans) == size:
-                return humans
+    # def spawn_group_with_form(
+    #     self, size, center, goal, form=[[1, 0], [0, 0.25], [0, -0.25]]
+    # ):
+    #     humans = []
+    #     while True:
+    #         spawn_pos = np.asarray(center) + np.asarray(form)
+    #         while True:
+    #             collision = False
+    #             for pos in spawn_pos:
+    #                 if self.check_collision(
+    #                     pos, others=humans
+    #                 ):  # break if there is no collision
+    #                     collision = True
+    #             if collision:
+    #                 spawn_pos += self.random_vector(
+    #                     length=self.human_radius[0]
+    #                 )  # gentlely nudge the new ped to avoid collision
+    #             else:
+    #                 break
+    #         for pos in spawn_pos:
+    #             human = Human(self.config, "humans")
+    #             if self.randomize_attributes:
+    #                 human.sample_random_attributes()
+    #             human.set(*pos, *goal, 0, 0)
+    #             humans.append(human)
+    #         # logging.info(f"spawn humans at {spawn_pos}, {len(humans)},{size}")
+    #         if len(humans) == size:
+    #             return humans
 
     def spawn_group(self, size, center, goal, type_idx=None):
         humans = []
@@ -403,12 +406,12 @@ class SceneManager(object):
             spawn_pos = center
             while True:
                 if not self.check_collision(
-                    spawn_pos, humans
+                    spawn_pos, radius=self.human_radius[type_idx], others=humans
                 ):  # break if there is no collision
                     break
                 else:
                     spawn_pos += self.random_vector(
-                        length=self.human_radius
+                        length=self.human_radius[type_idx]
                     )  # gentlely nudge the new ped to avoid collision
 
             human = Human(self.agent_config, "humans", type_idx)
@@ -419,7 +422,7 @@ class SceneManager(object):
             if len(humans) == size:
                 return humans
 
-    def check_collision(self, position, others=[], robot=False):
+    def check_collision(self, position, radius=0.3, others=[], robot=False):
         """Check collision, return true if there is collsion, false otherwise"""
 
         agents = (
@@ -427,7 +430,7 @@ class SceneManager(object):
             if not robot
             else self.humans + others
         )
-        radius = self.human_radius if not robot else self.robot_radius
+        # radius = radius if not robot else self.robot_radius
         # Check collision with agents
         for agent in agents:
             min_dist = radius + agent.radius + self.discomfort_dist
@@ -436,7 +439,7 @@ class SceneManager(object):
 
         # Check with obstacles
         for ob in self.get_obstacles():
-            min_dist = self.human_radius + self.discomfort_dist
+            min_dist = radius + self.discomfort_dist
             if line_distance(ob, position) < min_dist:
                 return True
         return False

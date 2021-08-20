@@ -40,7 +40,7 @@ goal_radius = 0.3
     phase.train = "cocktail_party"
     phase.val = "cocktail_party"
     phase.test = "cocktail_party"
-    human_num = [3, 5]
+    human_num = [2, 3]
     perpetual = false
     centralized_planning = false
     map_size = [10, 10]
@@ -51,6 +51,10 @@ goal_radius = 0.3
         table_shape = [[-1,1],[-1,-1],[1,-1],[1,1]]
         table_placement = [[-1,1],[-1,-1],[1,-1],[1,1]]
         circle_radius = 8
+
+        [env.scenarios.hospital_hallway]
+        width = 7
+        length = 5
 
         [env.scenarios.circle_crossing]
         circle_radius = 4
@@ -86,7 +90,7 @@ goal_radius = 0.3
         role = "guest"
         visible = true
         policy = "orca"
-        radius = 0.3
+        radius = 0.35
         v_pref = 1
         sensor = "coordinates"
 

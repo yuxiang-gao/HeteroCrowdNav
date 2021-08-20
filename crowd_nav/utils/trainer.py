@@ -211,6 +211,6 @@ class VNRLTrainer(Trainer):
 
         average_loss = losses / num_batches
         self.writer.add_scalar("RL/average_loss", average_loss, episode)
-        logging_debug("Average loss : %.2E", average_loss)
+        logging_debug("Average loss : %.2E".format(average_loss))
 
         return average_loss

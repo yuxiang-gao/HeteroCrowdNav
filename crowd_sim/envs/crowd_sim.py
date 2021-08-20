@@ -242,7 +242,7 @@ class CrowdSim(gym.Env):
         }
         if self.case_counter[phase] >= 0:
             human_num = (
-                self.human_num if self.robot.policy.multiagent_training else 1
+                self.human_num if self.robot.policy.multiagent_training else [1]
             )
             seed = counter_offset[phase] + self.case_counter[phase]
             self.set_scene(self.phase_scenario[phase], seed)
