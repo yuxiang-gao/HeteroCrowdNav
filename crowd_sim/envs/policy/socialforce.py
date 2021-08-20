@@ -28,21 +28,21 @@ class SocialForce(Policy):
         :return:
         """
         sf_state = []
-        self_state = state.self_state
+        robot_state = state.robot_state
         velocity = np.array(
-            (self_state.gx - self_state.px, self_state.gy - self_state.py)
+            (robot_state.gx - robot_state.px, robot_state.gy - robot_state.py)
         )
         speed = np.linalg.norm(velocity)
         pref_vel = velocity / speed if speed > 1 else velocity
 
         sf_state.append(
             (
-                self_state.px,
-                self_state.py,
+                robot_state.px,
+                robot_state.py,
                 pref_vel[0],
                 pref_vel[1],
-                self_state.gx,
-                self_state.gy,
+                robot_state.gx,
+                robot_state.gy,
             )
         )
         for human_state in state.human_states:

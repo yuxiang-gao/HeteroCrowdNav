@@ -6,13 +6,14 @@ import torch.nn as nn
 
 from crowd_nav.policy.cadrl import mlp
 from crowd_nav.policy.multi_human_rl import MultiHumanRL
+from crowd_sim.envs.utils.action import ActionRot, ActionXY
 
 
 class ValueNetwork(nn.Module):
     def __init__(
         self,
         input_dim,
-        self_state_dim,
+        robot_state_dim,
         mlp1_dims,
         mlp2_dims,
         mlp3_dims,
@@ -23,7 +24,7 @@ class ValueNetwork(nn.Module):
         cell_num,
     ):
         super().__init__()
-        self.self_state_dim = self_state_dim
+        self.robot_state_dim = robot_state_dim
         self.global_state_dim = mlp1_dims[-1]
         self.mlp1 = mlp(input_dim, mlp1_dims, last_relu=True)
         self.last_mpl1 = mlp1_dims[-1]
@@ -36,7 +37,7 @@ class ValueNetwork(nn.Module):
         self.attention_weights = None
         self.cell_size = cell_size
         self.cell_num = cell_num
-        mlp3_input_dim = mlp2_dims[-1] + self.self_state_dim
+        mlp3_input_dim = mlp2_dims[-1] + self.robot_state_dim
         self.mlp3 = mlp(mlp3_input_dim, mlp3_dims, last_relu=True)
         self.lin_value = nn.Linear(mlp3_dims[-1], 1)
         self.lin_policy = nn.Linear(mlp3_dims[-1], action_space_size)
@@ -52,8 +53,12 @@ class ValueNetwork(nn.Module):
         else:
             state = state_input
             lengths = torch.IntTensor([state.size()[1]])
+
+        if self.action_space is None:
+            self.build_action_space(state.robot_state.v_pref)
+
         size = state.shape
-        self_state = state[:, 0, : self.self_state_dim]
+        robot_state = state[:, 0, : self.robot_state_dim]
         mlp1_output = self.mlp1(state.view((-1, size[2])))
         mlp2_output = self.mlp2(mlp1_output)
         num_people = np.sum(state.detach().numpy()[:, :, 3] > 0, axis=1)
@@ -102,7 +107,7 @@ class ValueNetwork(nn.Module):
         weighted_feature = torch.sum(torch.mul(weights, features), dim=1)
 
         # concatenate agent's state with global weighted humans' state
-        joint_state = torch.cat([self_state, weighted_feature], dim=1)
+        joint_state = torch.cat([robot_state, weighted_feature], dim=1)
         joint_state = self.mlp3(joint_state)
         policies = torch.nn.functional.softmax(
             self.lin_policy(joint_state), dim=-1
@@ -116,13 +121,13 @@ class ValueNetwork(nn.Module):
         The input to the value network is always of shape (batch_size, # humans, rotated joint state length)
         """
         if self.action_space is None:
-            self.build_action_space(state.self_state.v_pref)
+            self.build_action_space(state.robot_state.v_pref)
         # POLICY, VALUE UPDATE (Look-ahead not appropriate here):
         occupancy_maps = None
         self.action_values = list()
         batch_state = torch.cat(
             [
-                torch.Tensor([state.self_state + human_state]).to(self.device)
+                torch.Tensor([state.robot_state + human_state]).to(self.device)
                 for human_state in state.human_states
             ],
             dim=0,
@@ -148,7 +153,7 @@ class ValueNetwork(nn.Module):
                     np.zeros(
                         (
                             1,
-                            self.env.max_humans - self.env.human_num,
+                            self.env.max_humans - sum(self.env.human_num),
                             ob.shape[2],
                         )
                     ),
@@ -201,3 +206,86 @@ class HARL(MultiHumanRL):
 
     def get_attention_weights(self):
         return self.model.attention_weights
+
+    def predict(self, state, obstacles=None):
+        if self.phase is None or self.device is None:
+            raise AttributeError("Phase, device attributes have to be set!")
+        if self.phase == "train" and self.epsilon is None:
+            raise AttributeError(
+                "Epsilon attribute has to be set in training phase"
+            )
+
+        if self.reach_destination(state):
+            return (
+                ActionXY(0, 0)
+                if self.kinematics == "holonomic"
+                else ActionRot(0, 0)
+            )
+        if self.action_space is None:
+            self.build_action_space(state.robot_state.v_pref)
+
+        if not state.human_states:
+            assert self.phase != "train"
+            if hasattr(self, "attention_weights"):
+                self.attention_weights = list()
+            return self.select_greedy_action(state.robot_state)
+
+        # POLICY, VALUE UPDATE (Look-ahead not appropriate here):
+        occupancy_maps = None
+        self.action_values = list()
+        batch_state = torch.cat(
+            [
+                torch.Tensor([state.robot_state + human_state]).to(self.device)
+                for human_state in state.human_states
+            ],
+            dim=0,
+        )
+        rotated_batch_input = self.rotate(batch_state).unsqueeze(0)
+        if self.with_om:
+            if occupancy_maps is None:
+                occupancy_maps = self.build_occupancy_maps(
+                    state.human_states
+                ).unsqueeze(0)
+            rotated_batch_input = torch.cat(
+                [rotated_batch_input, occupancy_maps.to(self.device)], dim=2
+            )
+        policy, value = self.model(rotated_batch_input)
+        self.action_values = policy.detach().numpy()[0].tolist()
+        if self.phase == "train":
+            self.last_state = self.transform(state)
+        ob = np.expand_dims(self.last_state.detach().numpy(), axis=0)
+        if self.env.max_humans > 0:
+            ob = np.concatenate(
+                (
+                    ob,
+                    np.zeros(
+                        (
+                            1,
+                            self.env.max_humans - self.env.human_num,
+                            ob.shape[2],
+                        )
+                    ),
+                ),
+                axis=1,
+            )
+
+        # batch_states = torch.cat(
+        #     [
+        #         torch.Tensor([state.robot_state + human_state]).to(self.device)
+        #         for human_state in state.human_states
+        #     ],
+        #     dim=0,
+        # )
+        # rotated_batch_input = self.rotate(batch_states).unsqueeze(0)
+
+        # pi, val = self.model(rotated_batch_input, getPI=True)
+        # val = val.data.item()
+        # a = pi.sample()
+        # log_pi = pi.log_prob(a).data.item()  # log_prob needs a Tensor
+        # a = a.data.item()
+        # next_action = self.action_space[a]
+
+        # if self.phase == "train":
+        #     self.last_state = self.transform(state)
+
+        return a, next_action, pi, val, log_pi
