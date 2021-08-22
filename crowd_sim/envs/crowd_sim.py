@@ -653,7 +653,7 @@ class CrowdSim(gym.Env):
 
             # add human start positions and goals
             human_colors = [cmap(i) for i in range(len(self.humans))]
-            for i in range(len(self.humans)):
+            for i, human in enumerate(self.humans):
                 human = self.humans[i]
                 human_goal = mlines.Line2D(
                     [human.get_goal_position()[0]],
@@ -762,8 +762,7 @@ class CrowdSim(gym.Env):
             # add human start positions and goals
             human_colors = [cmap(i) for i in range(len(self.humans))]
             if show_human_start_goal:
-                for i in range(len(self.humans)):
-                    human = self.humans[i]
+                for i, human in enumerate(self.humans):
                     human_goal = mlines.Line2D(
                         [human.get_goal_position()[0]],
                         [human.get_goal_position()[1]],
@@ -791,11 +790,6 @@ class CrowdSim(gym.Env):
                 linestyle="None",
                 markersize=8,
             )
-            robot_start_position = [
-                self.robot.get_start_position()[0],
-                self.robot.get_start_position()[1],
-            ]
-            ax.add_artist(robot_start)
             # add robot and its goal
             robot_positions = [state[0].position for state in self.states]
             goal = mlines.Line2D(
@@ -815,6 +809,7 @@ class CrowdSim(gym.Env):
             )
             # sensor_range = plt.Circle(robot_positions[0], self.robot_sensor_range, fill=False, ls='dashed')
             ax.add_artist(robot)
+            ax.add_artist(robot_start)
             ax.add_artist(goal)
             plt.legend([robot, goal], ["Robot", "Goal"], fontsize=14)
 
