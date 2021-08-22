@@ -101,7 +101,7 @@ def main():
     mode = "a" if args.resume else "w"
     file_handler = logging.FileHandler(log_file, mode=mode)
     stdout_handler = logging.StreamHandler(sys.stdout)
-    level = logging_info if not args.debug else logging.DEBUG
+    level = logging.INFO if not args.debug else logging.DEBUG
     logging.basicConfig(
         level=level,
         handlers=[stdout_handler, file_handler],
@@ -210,20 +210,20 @@ def main():
             f"Finish imitation learning. Weights saved to {il_weight_file}."
         )
         logging_info("Experience set size: %d/%d", len(memory), memory.capacity)
-    trainer.update_target_model(model)
+        trainer.update_target_model(model)
 
-    # eval
-    logging_info(
-        "Evaluate the model instantly after imitation learning on the validation cases"
-    )
-    explorer.run_k_episodes(env.case_size["val"], "val", episode=0)
-    explorer.log("val", 0)
-
-    if args.test_after_every_eval:
-        explorer.run_k_episodes(
-            env.case_size["test"], "test", episode=0, print_failure=True
+        # eval
+        logging_info(
+            "Evaluate the model instantly after imitation learning on the validation cases"
         )
-        explorer.log("test", 0)
+        explorer.run_k_episodes(env.case_size["val"], "val", episode=0)
+        explorer.log("val", 0)
+
+        if args.test_after_every_eval:
+            explorer.run_k_episodes(
+                env.case_size["test"], "test", episode=0, print_failure=True
+            )
+            explorer.log("test", 0)
 
     # reinforcement learning
     logging_info("-" * 80)
