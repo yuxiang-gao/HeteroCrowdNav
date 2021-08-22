@@ -1,4 +1,4 @@
-from crowd_sim.envs.utils.logging import logging_info, logging_debug
+import logging
 from enum import Enum
 from abc import ABC
 
@@ -8,6 +8,8 @@ from numpy.linalg import norm
 from crowd_sim.envs.utils.human import Human
 from crowd_sim.envs.utils.state import JointState
 from crowd_sim.envs.utils.utils import line_distance
+
+logger = logging.getLogger(__name__)
 
 
 class Scenario(str, Enum):
@@ -309,7 +311,7 @@ class SceneManager(object):
         # Spawn robot
         if set_robot:
             start, goal = self.scenario_manager.get_robot_spawn_position()
-            logging_debug(
+            logger.debug(
                 f"[{self.scenario_manager.scenario.value}] Spawn robot: {start} -> {goal}"
             )
             self.spawn_robot(start, goal)
@@ -328,7 +330,7 @@ class SceneManager(object):
                             break
                         else:
                             group_sizes.append(size)
-                logging_info(f"Generating groups of size: {group_sizes}")
+                logger.info(f"Generating groups of size: {group_sizes}")
             # else:
             #     group_sizes = np.ones(num_human)
             human_idx = np.arange(sum(num_human))
@@ -339,11 +341,11 @@ class SceneManager(object):
                     group_sizes
                 )
                 if size > 1:
-                    logging_debug(
+                    logger.debug(
                         f"Spawn group {i} of size {size}, center: {center}, goal: {goal}"
                     )
                 else:
-                    logging_debug(f"Spawn p{i}: {center} -> {goal}")
+                    logger.debug(f"Spawn p{i}: {center} -> {goal}")
                 self.humans += self.spawn_group(size, center, goal)
 
             for i, human in enumerate(self.humans):
@@ -361,7 +363,7 @@ class SceneManager(object):
                     self.humans += self.spawn_group(
                         1, center, goal, type_idx=type_idx
                     )
-                    logging_debug(
+                    logger.debug(
                         f"[{self.scenario_manager.scenario.value}] Spawn p{i} of type {type_idx}: {center} -> {goal}"
                     )
 
@@ -406,7 +408,7 @@ class SceneManager(object):
     #                 human.sample_random_attributes()
     #             human.set(*pos, *goal, 0, 0)
     #             humans.append(human)
-    #         # logging_info(f"spawn humans at {spawn_pos}, {len(humans)},{size}")
+    #         # logger.info(f"spawn humans at {spawn_pos}, {len(humans)},{size}")
     #         if len(humans) == size:
     #             return humans
 

@@ -1,9 +1,12 @@
 import copy
-from crowd_sim.envs.utils.logging import logging_info, logging_debug
+import logging
 import torch
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 from crowd_sim.envs.utils.info import *
+
+logger = logging.getLogger(__name__)
 
 
 class Explorer(object):
@@ -68,96 +71,99 @@ class Explorer(object):
         else:
             pbar = range(k)
 
-        for i in pbar:
-            ob = self.env.reset(phase)
-            done = False
-            states = []
-            actions = []
-            rewards = []
-            while not done:
-                action = self.robot.act(ob)
-                ob, reward, done, info = self.env.step(action)
-                states.append(self.robot.policy.last_state)
-                actions.append(action)
-                rewards.append(reward)
+        with logging_redirect_tqdm():
+            for i in pbar:
+                ob = self.env.reset(phase)
+                done = False
+                states = []
+                actions = []
+                rewards = []
+                while not done:
+                    action = self.robot.act(ob)
+                    ob, reward, done, info = self.env.step(action)
+                    states.append(self.robot.policy.last_state)
+                    actions.append(action)
+                    rewards.append(reward)
 
-                if isinstance(info, Discomfort):
-                    discomfort += 1
-                    min_dist.append(info.min_dist)
+                    if isinstance(info, Discomfort):
+                        discomfort += 1
+                        min_dist.append(info.min_dist)
 
-            if isinstance(info, ReachGoal):
-                success += 1
-                success_times.append(self.env.global_time)
-            elif isinstance(info, Collision):
-                collision += 1
-                collision_cases.append(i)
-                collision_times.append(self.env.global_time)
-            elif isinstance(info, Timeout):
-                timeout += 1
-                timeout_cases.append(i)
-                timeout_times.append(self.env.time_limit)
-
-            if isinstance(info, dict):
-                episode_info_record.append(info)
-                if info["events"]["succeed"]:
+                if isinstance(info, ReachGoal):
                     success += 1
                     success_times.append(self.env.global_time)
-                elif info["events"]["collision"]:
+                elif isinstance(info, Collision):
                     collision += 1
                     collision_cases.append(i)
                     collision_times.append(self.env.global_time)
-                elif info["events"]["obstacle_collision"]:
-                    obs_collision += 1
-                elif info["events"]["timeout"]:
+                elif isinstance(info, Timeout):
                     timeout += 1
                     timeout_cases.append(i)
                     timeout_times.append(self.env.time_limit)
-                # success += info["events"]["succeed"]
-                # collision += info["events"]["collision"]
-                # obs_collision += info["events"]["obstacle_collision"]
-                # timeout += info["events"]["timeout"]
 
-            else:
-                raise ValueError("Invalid end signal from environment")
+                if isinstance(info, dict):
+                    episode_info_record.append(info)
+                    if info["events"]["succeed"]:
+                        success += 1
+                        success_times.append(self.env.global_time)
+                    elif info["events"]["collision"]:
+                        collision += 1
+                        collision_cases.append(i)
+                        collision_times.append(self.env.global_time)
+                    elif info["events"]["obstacle_collision"]:
+                        obs_collision += 1
+                    elif info["events"]["timeout"]:
+                        timeout += 1
+                        timeout_cases.append(i)
+                        timeout_times.append(self.env.time_limit)
+                    # success += info["events"]["succeed"]
+                    # collision += info["events"]["collision"]
+                    # obs_collision += info["events"]["obstacle_collision"]
+                    # timeout += info["events"]["timeout"]
 
-            if update_memory:
-                if isinstance(info, ReachGoal) or isinstance(info, Collision):
-                    # only add positive(success) or negative(collision) experience in experience set
-                    self.update_memory(
-                        states, actions, rewards, imitation_learning
-                    )
-                elif isinstance(info, dict):
-                    if (
-                        info["events"]["succeed"]
-                        or info["events"]["collision"]
-                        or info["events"]["obstacle_collision"]
+                else:
+                    raise ValueError("Invalid end signal from environment")
+
+                if update_memory:
+                    if isinstance(info, ReachGoal) or isinstance(
+                        info, Collision
                     ):
+                        # only add positive(success) or negative(collision) experience in experience set
                         self.update_memory(
                             states, actions, rewards, imitation_learning
                         )
+                    elif isinstance(info, dict):
+                        if (
+                            info["events"]["succeed"]
+                            or info["events"]["collision"]
+                            or info["events"]["obstacle_collision"]
+                        ):
+                            self.update_memory(
+                                states, actions, rewards, imitation_learning
+                            )
 
-            cumulative_rewards.append(self.calc_value(0, rewards))
+                cumulative_rewards.append(self.calc_value(0, rewards))
 
-            returns = []
-            for step in range(len(rewards)):
-                step_return = sum(
-                    [
-                        pow(
-                            self.gamma,
-                            t * self.robot.time_step * self.robot.v_pref,
-                        )
-                        * reward
-                        for t, reward in enumerate(rewards[step:])
-                    ]
-                )
-                returns.append(step_return)
-            average_returns.append(average(returns))
+                returns = []
+                for step in range(len(rewards)):
+                    step_return = sum(
+                        [
+                            pow(
+                                self.gamma,
+                                t * self.robot.time_step * self.robot.v_pref,
+                            )
+                            * reward
+                            for t, reward in enumerate(rewards[step:])
+                        ]
+                    )
+                    returns.append(step_return)
+                average_returns.append(average(returns))
 
-            if k > 1:
-                pbar.set_postfix(
-                    reward=cumulative_rewards[-1],
-                    avg_return=average_returns[-1],
-                )
+                if k > 1:
+                    pbar.set_postfix(
+                        reward=cumulative_rewards[-1],
+                        avg_return=average_returns[-1],
+                    )
 
         success_rate = success / k
         collision_rate = (collision + obs_collision) / k
@@ -175,7 +181,7 @@ class Explorer(object):
             else extra_info + " in epoch {} ".format(epoch)
         )
         if k != 1:
-            logging_info(
+            logger.info(
                 "{:<5} {}has success rate: {:.2f}, collision rate: {:.2f}, nav time: {:.2f}, total reward: {:.4f},"
                 " average return: {:.4f}{}".format(
                     phase.upper(),
@@ -193,18 +199,18 @@ class Explorer(object):
                 sum(success_times + collision_times + timeout_times)
                 / self.robot.time_step
             )
-            logging_info(
+            logger.info(
                 "Frequency of being in danger: %.2f and average min separate distance in danger: %.2f",
                 discomfort / num_step,
                 average(min_dist),
             )
 
         if print_failure:
-            logging_info(
+            logger.info(
                 "Collision cases: "
                 + " ".join([str(x) for x in collision_cases])
             )
-            logging_info(
+            logger.info(
                 "Timeout cases: " + " ".join([str(x) for x in timeout_cases])
             )
 

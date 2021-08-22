@@ -9,10 +9,11 @@ import torch
 import gym
 import git
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 from crowd_sim.envs.utils.config import Config
-from crowd_sim.envs.utils.logging import logging_info, logging_debug
+from crowd_sim.envs.utils.logging import logging_init
 from crowd_sim.envs.utils.robot import Robot
 from crowd_nav.utils.trainer import VNRLTrainer
 from crowd_nav.utils.memory import ReplayMemory
@@ -98,30 +99,23 @@ def main():
     rl_weight_file = Path(output_dir, "rl_model.pth")
 
     # configure logging
-    mode = "a" if args.resume else "w"
-    file_handler = logging.FileHandler(log_file, mode=mode)
-    stdout_handler = logging.StreamHandler(sys.stdout)
     level = logging.INFO if not args.debug else logging.DEBUG
-    logging.basicConfig(
-        level=level,
-        handlers=[stdout_handler, file_handler],
-        format="%(asctime)s, %(levelname)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    logging_init(level, log_file, args.resume)
+    logger = logging.getLogger(__name__)
     repo = git.Repo(search_parent_directories=True)
-    logging_info("-" * 80)
-    logging_info(f"Git head hash code: {repo.head.object.hexsha}")
-    logging_info(f"Policy: {args.policy}")
-    logging_info(f"Output dir: {output_dir}")
+    logger.info("-" * 80)
+    logger.info(f"Git head hash code: {repo.head.object.hexsha}")
+    logger.info(f"Policy: {args.policy}")
+    logger.info(f"Output dir: {output_dir}")
     device = torch.device(
         "cuda:0" if torch.cuda.is_available() and args.gpu else "cpu"
     )
-    logging_info("Device: %s", device)
-    logging_info("-" * 80)
+    logger.info("Device: %s", device)
+    logger.info("-" * 80)
     writer = SummaryWriter(log_dir=output_dir)
 
     # configure policy
-    logging_info("Configuring policy...")
+    logger.info("Configuring policy...")
     policy = policy_factory[args.policy]()
     if not policy.trainable:
         parser.error("Policy has to be trainable")
@@ -129,7 +123,7 @@ def main():
     policy.set_device(device)
 
     # configure environment
-    logging_info("Configuring environment...")
+    logger.info("Configuring environment...")
     env = gym.make("CrowdSim-v0")
     env.configure(config("env"))
     robot = env.robot
@@ -149,7 +143,7 @@ def main():
     checkpoint_interval = train_config.get("checkpoint_interval")
 
     # configure trainer and explorer
-    logging_info("Configuring trainer and explorer...")
+    logger.info("Configuring trainer and explorer...")
     memory = ReplayMemory(capacity)
     model = policy.get_model()
     batch_size = train_config("trainer", "batch_size")
@@ -172,19 +166,19 @@ def main():
     )
 
     # imitation learning
-    logging_info("-" * 80)
-    logging_info("Start imitation learning...")
+    logger.info("-" * 80)
+    logger.info("Start imitation learning...")
     if args.resume:
         if not Path(rl_weight_file).exists():
             logging.error("RL weights does not exist")
         model.load_state_dict(torch.load(rl_weight_file))
         rl_weight_file = Path(output_dir, "resumed_rl_model.pth")
-        logging_info(
+        logger.info(
             f"Load reinforcement learning trained weights from {rl_weight_file}. Resume training..."
         )
     elif Path(il_weight_file).exists():
         model.load_state_dict(torch.load(il_weight_file))
-        logging_info("Load imitation learning trained weights...")
+        logger.info("Load imitation learning trained weights...")
     else:
         il_episodes = train_config("imitation_learning", "il_episodes")
         il_policy = train_config("imitation_learning", "il_policy")
@@ -206,14 +200,12 @@ def main():
         )
         trainer.optimize_epoch(il_epochs)
         torch.save(model.state_dict(), il_weight_file)
-        logging_info(
+        logger.info(
             f"Finish imitation learning. Weights saved to {il_weight_file}."
         )
-        logging_info("Experience set size: %d/%d", len(memory), memory.capacity)
-        trainer.update_target_model(model)
-
+        logger.info("Experience set size: %d/%d", len(memory), memory.capacity)
         # eval
-        logging_info(
+        logger.info(
             "Evaluate the model instantly after imitation learning on the validation cases"
         )
         explorer.run_k_episodes(env.case_size["val"], "val", episode=0)
@@ -224,10 +216,11 @@ def main():
                 env.case_size["test"], "test", episode=0, print_failure=True
             )
             explorer.log("test", 0)
+    trainer.update_target_model(model)
 
     # reinforcement learning
-    logging_info("-" * 80)
-    logging_info("Start reinforcement learning...")
+    logger.info("-" * 80)
+    logger.info("Start reinforcement learning...")
     policy.set_env(env)
     robot.set_policy(policy)
     robot.print_info()
@@ -236,72 +229,75 @@ def main():
     if args.resume:
         robot.policy.set_epsilon(epsilon_end)
         explorer.run_k_episodes(100, "train", update_memory=True, episode=0)
-        logging_info("Experience set size: %d/%d", len(memory), memory.capacity)
+        logger.info("Experience set size: %d/%d", len(memory), memory.capacity)
     episode = 0
     best_val_reward = -1
     best_val_model = None
 
-    for episode in tqdm(range(train_episodes), desc="RL", colour="blue"):
-        if args.resume:
-            epsilon = epsilon_end
-        else:
-            if episode < epsilon_decay:
-                epsilon = (
-                    epsilon_start
-                    + (epsilon_end - epsilon_start) / epsilon_decay * episode
-                )
-            else:
+    with logging_redirect_tqdm():
+        for episode in tqdm(range(train_episodes), desc="RL", colour="blue"):
+            if args.resume:
                 epsilon = epsilon_end
-        robot.policy.set_epsilon(epsilon)
+            else:
+                if episode < epsilon_decay:
+                    epsilon = (
+                        epsilon_start
+                        + (epsilon_end - epsilon_start)
+                        / epsilon_decay
+                        * episode
+                    )
+                else:
+                    epsilon = epsilon_end
+            robot.policy.set_epsilon(epsilon)
 
-        # sample k episodes into memory and optimize over the generated memory
-        explorer.run_k_episodes(
-            sample_episodes, "train", update_memory=True, episode=episode
-        )
-        explorer.log("train", episode)
-
-        trainer.optimize_batch(train_batches, episode)
-
-        if episode % target_update_interval == 0:
-            explorer.update_target_model(model)
-        # evaluate the model
-        if episode % evaluation_interval == 0:
-            _, _, _, reward, _ = explorer.run_k_episodes(
-                env.case_size["val"], "val", episode=episode
+            # sample k episodes into memory and optimize over the generated memory
+            explorer.run_k_episodes(
+                sample_episodes, "train", update_memory=True, episode=episode
             )
-            explorer.log("val", episode // evaluation_interval)
+            explorer.log("train", episode)
 
-            if reward > best_val_reward:
-                best_val_reward = reward
-                best_val_model = deepcopy(policy.get_state_dict())
-                torch.save(model.state_dict(), rl_weight_file)
+            trainer.optimize_batch(train_batches, episode)
 
-            if args.test_after_every_eval:
-                explorer.run_k_episodes(
-                    env.case_size["test"],
-                    "test",
-                    episode=episode,
-                    print_failure=True,
+            if episode % target_update_interval == 0:
+                explorer.update_target_model(model)
+            # evaluate the model
+            if episode % evaluation_interval == 0:
+                _, _, _, reward, _ = explorer.run_k_episodes(
+                    env.case_size["val"], "val", episode=episode
                 )
-                explorer.log("test", episode // evaluation_interval)
+                explorer.log("val", episode // evaluation_interval)
 
-        if episode != 0 and episode % checkpoint_interval == 0:
-            current_checkpoint = episode // checkpoint_interval - 1
-            save_every_checkpoint_rl_weight_file = Path(
-                rl_weight_file.parent,
-                str(rl_weight_file.stem)
-                + "_"
-                + str(current_checkpoint)
-                + ".pth",
-            )
+                if reward > best_val_reward:
+                    best_val_reward = reward
+                    best_val_model = deepcopy(policy.get_state_dict())
+                    torch.save(model.state_dict(), rl_weight_file)
 
-            policy.save_model(save_every_checkpoint_rl_weight_file)
+                if args.test_after_every_eval:
+                    explorer.run_k_episodes(
+                        env.case_size["test"],
+                        "test",
+                        episode=episode,
+                        print_failure=True,
+                    )
+                    explorer.log("test", episode // evaluation_interval)
+
+            if episode != 0 and episode % checkpoint_interval == 0:
+                current_checkpoint = episode // checkpoint_interval - 1
+                save_every_checkpoint_rl_weight_file = Path(
+                    rl_weight_file.parent,
+                    str(rl_weight_file.stem)
+                    + "_"
+                    + str(current_checkpoint)
+                    + ".pth",
+                )
+
+                policy.save_model(save_every_checkpoint_rl_weight_file)
 
     # # test with the best val model
     if best_val_model is not None:
         policy.load_state_dict(best_val_model)
         torch.save(best_val_model, Path(output_dir, "best_val.pth"))
-        logging_info(
+        logger.info(
             "Save the best val model with the reward: {}".format(
                 best_val_reward
             )

@@ -1,4 +1,4 @@
-from crowd_sim.envs.utils.logging import logging_info, logging_debug
+import logging
 import numpy as np
 
 import torch
@@ -7,6 +7,8 @@ import torch.nn as nn
 from crowd_nav.policy.cadrl import mlp
 from crowd_nav.policy.multi_human_rl import MultiHumanRL
 from crowd_sim.envs.utils.action import ActionRot, ActionXY
+
+logger = logging.getLogger(__name__)
 
 
 class ValueNetwork(nn.Module):
@@ -198,7 +200,7 @@ class HARL(MultiHumanRL):
         )
         if self.with_om:
             self.name = "OM-HARL"
-        logging_info(
+        logger.info(
             "Policy: {} {} global state".format(
                 self.name, "w/" if with_global_state else "w/o"
             )

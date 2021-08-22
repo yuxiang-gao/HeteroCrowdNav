@@ -1,9 +1,11 @@
+import logging
 import torch
 import torch.nn as nn
 import numpy as np
-from crowd_sim.envs.utils.logging import logging_info, logging_debug
 from crowd_nav.policy.cadrl import mlp
 from crowd_nav.policy.multi_human_rl import MultiHumanRL
+
+logger = logging.getLogger(__name__)
 
 
 class ValueNetwork1(nn.Module):
@@ -98,7 +100,7 @@ class LstmRL(MultiHumanRL):
                 global_state_dim,
             )
         self.multiagent_training = lstm_config["multiagent_training"]
-        logging_info(
+        logger.info(
             "Policy: {}LSTM-RL {} pairwise interaction module".format(
                 "OM-" if self.with_om else "",
                 "w/" if with_interaction_module else "w/o",

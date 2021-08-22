@@ -1,10 +1,12 @@
 import abc
-from crowd_sim.envs.utils.logging import logging_info, logging_debug
+import logging
 import numpy as np
 from numpy.linalg import norm
 from crowd_sim.envs.policy.policy_factory import policy_factory
 from crowd_sim.envs.utils.action import ActionXY, ActionRot
 from crowd_sim.envs.utils.state import ObservableState, FullState
+
+logger = logging.getLogger(__name__)
 
 
 class Agent(object):
@@ -33,7 +35,7 @@ class Agent(object):
         self.time_step = None
 
     def print_info(self):
-        logging_info(
+        logger.info(
             "Agent is {} and has {} kinematic constraint".format(
                 "visible" if self.visible else "invisible", self.kinematics
             )

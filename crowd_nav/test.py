@@ -12,7 +12,7 @@ from crowd_nav.policy.policy_factory import policy_factory
 from crowd_sim.envs.utils.robot import Robot
 from crowd_sim.envs.policy.orca import ORCA
 from crowd_sim.envs.utils.config import Config
-from crowd_sim.envs.utils.logging import logging_info, logging_debug
+from crowd_sim.envs.utils.logging import logging_init
 
 
 def main():
@@ -46,15 +46,12 @@ def main():
 
     # configure logging and device
     level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s, %(levelname)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    logging_init(level)
+    logger = logging.getLogger(__name__)
     device = torch.device(
         "cuda:0" if torch.cuda.is_available() and args.gpu else "cpu"
     )
-    logging_info("Using device: %s", device)
+    logger.info("Using device: %s", device)
 
     if args.model_dir is not None:
         if args.config is not None:
@@ -63,7 +60,7 @@ def main():
             config_file = Path(args.model_dir, "configs.toml")
         if args.il:
             model_weights = Path(args.model_dir, "il_model.pth")
-            logging_info("Loaded IL weights")
+            logger.info("Loaded IL weights")
         elif args.rl:
             if Path(args.model_dir, "resumed_rl_model.pth").exists():
                 model_weights = Path(args.model_dir, "resumed_rl_model.pth")
@@ -71,10 +68,10 @@ def main():
                 # print(os.listdir(args.model_dir))
                 model_weights = sorted(Path(args.model_dir).glob("*.pth"))[-1]
 
-            logging_info(f"Loaded RL weights at {model_weights}")
+            logger.info(f"Loaded RL weights at {model_weights}")
         else:
             model_weights = Path(args.model_dir, "best_val.pth")
-            logging_info("Loaded RL weights with best VAL")
+            logger.info("Loaded RL weights with best VAL")
 
     else:
         config_file = args.config
@@ -136,7 +133,7 @@ def main():
             robot.policy.safety_space = args.safety_space
         else:
             robot.policy.safety_space = args.safety_space
-        logging_info("ORCA agent buffer: %f", robot.policy.safety_space)
+        logger.info("ORCA agent buffer: %f", robot.policy.safety_space)
 
     policy.set_env(env)
     robot.print_info()
@@ -164,7 +161,7 @@ def main():
             ]
         )
 
-        logging_info(
+        logger.info(
             "It takes %.2f seconds to finish. Final status is %s, cumulative_reward is %f",
             env.global_time,
             info["events"],
@@ -195,7 +192,7 @@ def main():
             env.render("video", args.video_file)
         if robot.visible and info == "reach goal":
             human_times = env.get_human_times()
-            logging_info(
+            logger.info(
                 "Average time for humans to reach goal: %.2f",
                 sum(human_times) / len(human_times),
             )

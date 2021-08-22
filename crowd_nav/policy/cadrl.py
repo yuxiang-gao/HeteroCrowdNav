@@ -1,11 +1,13 @@
+import logging
 import torch
 import torch.nn as nn
 import numpy as np
 import itertools
-from crowd_sim.envs.utils.logging import logging_info, logging_debug
 from crowd_sim.envs.policy.policy import Policy
 from crowd_sim.envs.utils.action import ActionRot, ActionXY
 from crowd_sim.envs.utils.state import ObservableState, FullState
+
+logger = logging.getLogger(__name__)
 
 
 def mlp(input_dim, mlp_dims, last_relu=False):
@@ -65,7 +67,7 @@ class CADRL(Policy):
         self.set_common_parameters(config)
         self.__dict__.update(config["cadrl"])
         self.model = ValueNetwork(self.joint_state_dim, self.mlp_dims)
-        logging_info("Policy: CADRL without occupancy map")
+        logger.info("Policy: CADRL without occupancy map")
 
     def set_common_parameters(self, config):
         self.__dict__.update(config["rl"])

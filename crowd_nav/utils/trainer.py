@@ -1,4 +1,4 @@
-from crowd_sim.envs.utils.logging import logging_info, logging_debug
+import logging
 import copy
 from abc import ABC, abstractmethod
 
@@ -9,6 +9,9 @@ from torch.optim import optimizer
 from torch.utils.data import DataLoader
 
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
+
+logger = logging.getLogger(__name__)
 
 
 class Trainer(ABC):
@@ -41,7 +44,7 @@ class Trainer(ABC):
             ),
         }
         self.optimizer = optimizers.get(self.optimizer_name)
-        logging_info(
+        logger.info(
             "Lr: {}  with {} optimizer for parameters [{}]".format(
                 learning_rate,
                 " ".join(
@@ -77,6 +80,7 @@ class PPOTrainer(Trainer):
             )
         average_epoch_loss = 0
         epoch_loop = tqdm(range(num_epochs), desc="Imitate", colour="blue")
+
         for epoch in epoch_loop:
             epoch_loss = 0
             data_loop = tqdm(
@@ -85,29 +89,30 @@ class PPOTrainer(Trainer):
                 colour="green",
                 leave=False,
             )
-            for data in data_loop:
-                if len(data) == 4:  # regular
-                    inputs, values, _, _ = data
-                # elif len(data) = 6: # PPO
-                #     inputs, values, log_probs
-                inputs = Variable(inputs)
-                values = Variable(values)
+            with logging_redirect_tqdm():
+                for data in data_loop:
+                    if len(data) == 4:  # regular
+                        inputs, values, _, _ = data
+                    # elif len(data) = 6: # PPO
+                    #     inputs, values, log_probs
+                    inputs = Variable(inputs)
+                    values = Variable(values)
 
-                self.optimizer.zero_grad()
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, values)
-                loss.backward()
-                self.optimizer.step()
-                epoch_loss += loss.data.item()
-                # pbar.set_description(f"Epoch [{epoch}/{num_epochs}]")
-                data_loop.set_postfix(loss=loss.data.item())
+                    self.optimizer.zero_grad()
+                    outputs = self.model(inputs)
+                    loss = self.criterion(outputs, values)
+                    loss.backward()
+                    self.optimizer.step()
+                    epoch_loss += loss.data.item()
+                    # pbar.set_description(f"Epoch [{epoch}/{num_epochs}]")
+                    data_loop.set_postfix(loss=loss.data.item())
 
             average_epoch_loss = epoch_loss / len(self.memory)
             self.writer.add_scalar(
                 "IL/average_epoch_loss", average_epoch_loss, epoch
             )
             epoch_loop.set_postfix(loss=average_epoch_loss)
-            logging_debug(
+            logger.debug(
                 "Average loss in epoch %d: %.2E".format(
                     epoch, average_epoch_loss
                 )
@@ -126,33 +131,38 @@ class PPOTrainer(Trainer):
         pbar = tqdm(
             self.data_loader, total=num_batches, leave=False, colour="green"
         )
-        # batch_count = 0
-        for batch_count, (inputs, values, rewards, next_states) in enumerate(
-            pbar
-        ):
-            inputs = Variable(inputs)
-            values = Variable(values)
+        with logging_redirect_tqdm():
+            for batch_count, (
+                inputs,
+                values,
+                rewards,
+                next_states,
+            ) in enumerate(pbar):
+                inputs = Variable(inputs)
+                values = Variable(values)
 
-            self.optimizer.zero_grad()
-            outputs = self.model(inputs)
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs)
 
-            gamma_bar = pow(self.gamma, self.time_step * self.v_pref)
-            target_values = rewards + gamma_bar * self.target_model(next_states)
+                gamma_bar = pow(self.gamma, self.time_step * self.v_pref)
+                target_values = rewards + gamma_bar * self.target_model(
+                    next_states
+                )
 
-            loss = self.criterion(outputs, target_values)
-            loss.backward()
-            self.optimizer.step()
-            losses += loss.data.item()
+                loss = self.criterion(outputs, target_values)
+                loss.backward()
+                self.optimizer.step()
+                losses += loss.data.item()
 
-            pbar.set_description(f"Episode [{episode}]")
-            pbar.set_postfix(loss=loss.data.item())
+                pbar.set_description(f"Episode [{episode}]")
+                pbar.set_postfix(loss=loss.data.item())
 
-            if batch_count > num_batches:
-                break
+                if batch_count > num_batches:
+                    break
 
         average_loss = losses / num_batches
         self.writer.add_scalar("RL/average_loss", average_loss, episode)
-        logging_debug("Average loss : %.2E".format(average_loss))
+        logger.debug("Average loss : %.2E".format(average_loss))
 
         return average_loss
 
@@ -190,25 +200,26 @@ class VNRLTrainer(Trainer):
                 colour="green",
                 leave=False,
             )
-            for inputs, values, _, _ in data_loop:
-                inputs = Variable(inputs)
-                values = Variable(values)
+            with logging_redirect_tqdm():
+                for inputs, values, _, _ in data_loop:
+                    inputs = Variable(inputs)
+                    values = Variable(values)
 
-                self.optimizer.zero_grad()
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, values)
-                loss.backward()
-                self.optimizer.step()
-                epoch_loss += loss.data.item()
-                # pbar.set_description(f"Epoch [{epoch}/{num_epochs}]")
-                data_loop.set_postfix(loss=loss.data.item())
+                    self.optimizer.zero_grad()
+                    outputs = self.model(inputs)
+                    loss = self.criterion(outputs, values)
+                    loss.backward()
+                    self.optimizer.step()
+                    epoch_loss += loss.data.item()
+                    # pbar.set_description(f"Epoch [{epoch}/{num_epochs}]")
+                    data_loop.set_postfix(loss=loss.data.item())
 
             average_epoch_loss = epoch_loss / len(self.memory)
             self.writer.add_scalar(
                 "IL/average_epoch_loss", average_epoch_loss, epoch
             )
             epoch_loop.set_postfix(loss=average_epoch_loss)
-            logging_debug(
+            logger.debug(
                 "Average loss in epoch %d: %.2E".format(
                     epoch, average_epoch_loss
                 )
@@ -227,32 +238,37 @@ class VNRLTrainer(Trainer):
         pbar = tqdm(
             self.data_loader, total=num_batches, leave=False, colour="green"
         )
-        # batch_count = 0
-        for batch_count, (inputs, values, rewards, next_states) in enumerate(
-            pbar
-        ):
-            inputs = Variable(inputs)
-            values = Variable(values)
+        with logging_redirect_tqdm():
+            for batch_count, (
+                inputs,
+                values,
+                rewards,
+                next_states,
+            ) in enumerate(pbar):
+                inputs = Variable(inputs)
+                values = Variable(values)
 
-            self.optimizer.zero_grad()
-            outputs = self.model(inputs)
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs)
 
-            gamma_bar = pow(self.gamma, self.time_step * self.v_pref)
-            target_values = rewards + gamma_bar * self.target_model(next_states)
+                gamma_bar = pow(self.gamma, self.time_step * self.v_pref)
+                target_values = rewards + gamma_bar * self.target_model(
+                    next_states
+                )
 
-            loss = self.criterion(outputs, target_values)
-            loss.backward()
-            self.optimizer.step()
-            losses += loss.data.item()
+                loss = self.criterion(outputs, target_values)
+                loss.backward()
+                self.optimizer.step()
+                losses += loss.data.item()
 
-            pbar.set_description(f"Episode [{episode}]")
-            pbar.set_postfix(loss=loss.data.item())
+                pbar.set_description(f"Episode [{episode}]")
+                pbar.set_postfix(loss=loss.data.item())
 
-            if batch_count > num_batches:
-                break
+                if batch_count > num_batches:
+                    break
 
         average_loss = losses / num_batches
         self.writer.add_scalar("RL/average_loss", average_loss, episode)
-        logging_debug("Average loss : %.2E".format(average_loss))
+        logger.debug("Average loss : %.2E".format(average_loss))
 
         return average_loss

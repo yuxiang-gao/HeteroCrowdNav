@@ -1,10 +1,14 @@
+import logging
+
 import torch
 import torch.nn as nn
 from torch.nn.functional import softmax
 import torch.nn.utils.rnn as rnn_utils
-from crowd_sim.envs.utils.logging import logging_info, logging_debug
+
 from crowd_nav.policy.cadrl import mlp
 from crowd_nav.policy.multi_human_rl import MultiHumanRL
+
+logger = logging.getLogger(__name__)
 
 
 class ValueNetwork(nn.Module):
@@ -132,7 +136,7 @@ class SARL(MultiHumanRL):
         )
         if self.with_om:
             self.name = "OM-SARL"
-        logging_info(
+        logger.info(
             "Policy: {} {} global state".format(
                 self.name, "w/" if with_global_state else "w/o"
             )

@@ -1,4 +1,4 @@
-from crowd_sim.envs.utils.logging import logging_info, logging_debug
+import logging
 import gym
 import matplotlib.lines as mlines
 import numpy as np
@@ -8,6 +8,8 @@ from numpy.linalg import norm
 from crowd_sim.envs.utils.human import Human
 from crowd_sim.envs.utils.info import *
 from crowd_sim.envs.utils.utils import point_to_segment_dist
+
+logger = logging.getLogger(__name__)
 
 
 class CrowdSim(gym.Env):
@@ -85,17 +87,17 @@ class CrowdSim(gym.Env):
             raise NotImplementedError
         self.case_counter = {"train": 0, "test": 0, "val": 0}
 
-        logging_info("human number: {}".format(self.human_num))
+        logger.info("human number: {}".format(self.human_num))
         if self.randomize_attributes:
-            logging_info("Randomize human's radius and preferred speed")
+            logger.info("Randomize human's radius and preferred speed")
         else:
-            logging_info("Not randomize human's radius and preferred speed")
-        logging_info(
+            logger.info("Not randomize human's radius and preferred speed")
+        logger.info(
             "Training simulation: {}, test simulation: {}".format(
                 self.train_val_sim, self.test_scenario
             )
         )
-        logging_info(
+        logger.info(
             "Square width: {}, circle width: {}".format(
                 self.square_width, self.circle_radius
             )

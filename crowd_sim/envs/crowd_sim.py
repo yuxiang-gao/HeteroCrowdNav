@@ -1,3 +1,4 @@
+import logging
 import random
 import math
 
@@ -19,7 +20,6 @@ from crowd_sim.envs.utils.human import Human
 from crowd_sim.envs.utils.robot import Robot
 from crowd_sim.envs.utils.info import *
 from crowd_sim.envs.utils.utils import *
-from crowd_sim.envs.utils.logging import logging_info, logging_debug
 from crowd_sim.envs.utils.scenarios import (
     Scenario,
     ScenarioManager,
@@ -52,6 +52,7 @@ goal = 0
     velocity = []
     distance_traversed = []
 """
+logger = logging.getLogger(__name__)
 
 
 class CrowdSim(gym.Env):
@@ -197,12 +198,12 @@ class CrowdSim(gym.Env):
         else:
             raise NotImplementedError
         self.case_counter = {"train": 0, "test": 0, "val": 0}
-        logging_info("Human number: {}".format(self.human_num))
+        logger.info("Human number: {}".format(self.human_num))
         if self.randomize_attributes:
-            logging_info("Randomize human's radius and preferred speed")
+            logger.info("Randomize human's radius and preferred speed")
         else:
-            logging_info("NOT randomize human's radius and preferred speed")
-        logging_info(
+            logger.info("NOT randomize human's radius and preferred speed")
+        logger.info(
             "Training simulation: {}, test simulation: {}".format(
                 self.phase_scenario["train"], self.phase_scenario["test"]
             )
@@ -407,7 +408,7 @@ class CrowdSim(gym.Env):
                 )
                 if dist < 0:
                     # detect collision but don't take humans' collision into account
-                    logging_debug("Collision happens between humans in step()")
+                    logger.debug("Collision happens between humans in step()")
         # check if reaching the goal
         end_position = np.array(
             self.robot.compute_position(action, self.time_step)
@@ -590,7 +591,7 @@ class CrowdSim(gym.Env):
             )
             if closest_dist < 0:
                 collisions += 1
-                logging_debug(
+                logger.debug(
                     "Collision: distance between robot and p{} is {:.2E} at time {:.2E}".format(
                         human.id, closest_dist, self.global_time
                     )
