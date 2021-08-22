@@ -1,4 +1,3 @@
-import logging
 import random
 import math
 
@@ -20,6 +19,7 @@ from crowd_sim.envs.utils.human import Human
 from crowd_sim.envs.utils.robot import Robot
 from crowd_sim.envs.utils.info import *
 from crowd_sim.envs.utils.utils import *
+from crowd_sim.envs.utils.logging import logging_info, logging_debug
 from crowd_sim.envs.utils.scenarios import (
     Scenario,
     ScenarioManager,
@@ -197,12 +197,12 @@ class CrowdSim(gym.Env):
         else:
             raise NotImplementedError
         self.case_counter = {"train": 0, "test": 0, "val": 0}
-        logging.info("Human number: {}".format(self.human_num))
+        logging_info("Human number: {}".format(self.human_num))
         if self.randomize_attributes:
-            logging.info("Randomize human's radius and preferred speed")
+            logging_info("Randomize human's radius and preferred speed")
         else:
-            logging.info("NOT randomize human's radius and preferred speed")
-        logging.info(
+            logging_info("NOT randomize human's radius and preferred speed")
+        logging_info(
             "Training simulation: {}, test simulation: {}".format(
                 self.phase_scenario["train"], self.phase_scenario["test"]
             )

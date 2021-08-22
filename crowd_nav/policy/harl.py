@@ -1,4 +1,4 @@
-import logging
+from crowd_sim.envs.utils.logging import logging_info, logging_debug
 import numpy as np
 
 import torch
@@ -198,7 +198,7 @@ class HARL(MultiHumanRL):
         )
         if self.with_om:
             self.name = "OM-HARL"
-        logging.info(
+        logging_info(
             "Policy: {} {} global state".format(
                 self.name, "w/" if with_global_state else "w/o"
             )

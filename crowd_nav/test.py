@@ -12,6 +12,7 @@ from crowd_nav.policy.policy_factory import policy_factory
 from crowd_sim.envs.utils.robot import Robot
 from crowd_sim.envs.policy.orca import ORCA
 from crowd_sim.envs.utils.config import Config
+from crowd_sim.envs.utils.logging import logging_info, logging_debug
 
 
 def main():
@@ -53,7 +54,7 @@ def main():
     device = torch.device(
         "cuda:0" if torch.cuda.is_available() and args.gpu else "cpu"
     )
-    logging.info("Using device: %s", device)
+    logging_info("Using device: %s", device)
 
     if args.model_dir is not None:
         if args.config is not None:
@@ -62,7 +63,7 @@ def main():
             config_file = Path(args.model_dir, "configs.toml")
         if args.il:
             model_weights = Path(args.model_dir, "il_model.pth")
-            logging.info("Loaded IL weights")
+            logging_info("Loaded IL weights")
         elif args.rl:
             if Path(args.model_dir, "resumed_rl_model.pth").exists():
                 model_weights = Path(args.model_dir, "resumed_rl_model.pth")
@@ -70,10 +71,10 @@ def main():
                 # print(os.listdir(args.model_dir))
                 model_weights = sorted(Path(args.model_dir).glob("*.pth"))[-1]
 
-            logging.info(f"Loaded RL weights at {model_weights}")
+            logging_info(f"Loaded RL weights at {model_weights}")
         else:
             model_weights = Path(args.model_dir, "best_val.pth")
-            logging.info("Loaded RL weights with best VAL")
+            logging_info("Loaded RL weights with best VAL")
 
     else:
         config_file = args.config
@@ -135,7 +136,7 @@ def main():
             robot.policy.safety_space = args.safety_space
         else:
             robot.policy.safety_space = args.safety_space
-        logging.info("ORCA agent buffer: %f", robot.policy.safety_space)
+        logging_info("ORCA agent buffer: %f", robot.policy.safety_space)
 
     policy.set_env(env)
     robot.print_info()
@@ -163,7 +164,7 @@ def main():
             ]
         )
 
-        logging.info(
+        logging_info(
             "It takes %.2f seconds to finish. Final status is %s, cumulative_reward is %f",
             env.global_time,
             info["events"],
@@ -194,7 +195,7 @@ def main():
             env.render("video", args.video_file)
         if robot.visible and info == "reach goal":
             human_times = env.get_human_times()
-            logging.info(
+            logging_info(
                 "Average time for humans to reach goal: %.2f",
                 sum(human_times) / len(human_times),
             )

@@ -1,5 +1,5 @@
 import copy
-import logging
+from crowd_sim.envs.utils.logging import logging_info, logging_debug
 import torch
 from tqdm import tqdm
 
@@ -126,7 +126,7 @@ class Explorer(object):
                     self.update_memory(
                         states, actions, rewards, imitation_learning
                     )
-                if isinstance(info, dict):
+                elif isinstance(info, dict):
                     if (
                         info["events"]["succeed"]
                         or info["events"]["collision"]
@@ -175,7 +175,7 @@ class Explorer(object):
             else extra_info + " in epoch {} ".format(epoch)
         )
         if k != 1:
-            logging.info(
+            logging_info(
                 "{:<5} {}has success rate: {:.2f}, collision rate: {:.2f}, nav time: {:.2f}, total reward: {:.4f},"
                 " average return: {:.4f}{}".format(
                     phase.upper(),
@@ -193,18 +193,18 @@ class Explorer(object):
                 sum(success_times + collision_times + timeout_times)
                 / self.robot.time_step
             )
-            logging.info(
+            logging_info(
                 "Frequency of being in danger: %.2f and average min separate distance in danger: %.2f",
                 discomfort / num_step,
                 average(min_dist),
             )
 
         if print_failure:
-            logging.info(
+            logging_info(
                 "Collision cases: "
                 + " ".join([str(x) for x in collision_cases])
             )
-            logging.info(
+            logging_info(
                 "Timeout cases: " + " ".join([str(x) for x in timeout_cases])
             )
 

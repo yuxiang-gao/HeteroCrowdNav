@@ -1,4 +1,4 @@
-import logging
+from crowd_sim.envs.utils.logging import logging_info, logging_debug
 from enum import Enum
 from abc import ABC
 
@@ -7,7 +7,7 @@ from numpy.linalg import norm
 
 from crowd_sim.envs.utils.human import Human
 from crowd_sim.envs.utils.state import JointState
-from crowd_sim.envs.utils.utils import line_distance, logging_debug
+from crowd_sim.envs.utils.utils import line_distance
 
 
 class Scenario(str, Enum):
@@ -159,20 +159,21 @@ class ScenarioManager(object):
             )
         if self.scenario == Scenario.COCKTAIL_PARTY:
             if type_idx == 1:  # "guest"
-                start, goal = self.rng.choice(
+                start_center, goal_center = self.rng.choice(
                     self.guest_spawn_positions,
                     size=2,
                     replace=False,
                 )
                 offset_margin = 0.4
-                start += np.array(
+                start = start_center + np.array(
                     self.sample_pos_goal_on_circle(
                         self.table_radius + offset_margin, np.pi * 2
                     )[0]
                 )
-                vec = np.asarray(start - goal)
-                vec = vec / norm(vec)
-                goal += vec * (self.table_radius + offset_margin)
+                vec = np.array(goal_center - start_center)
+                # vec = vec / norm(vec)
+                # goal += vec * (self.table_radius + offset_margin)
+                goal = start + vec
                 return start, goal
 
             elif type_idx == 0:  # "waiter"
@@ -327,7 +328,7 @@ class SceneManager(object):
                             break
                         else:
                             group_sizes.append(size)
-                logging.info(f"Generating groups of size: {group_sizes}")
+                logging_info(f"Generating groups of size: {group_sizes}")
             # else:
             #     group_sizes = np.ones(num_human)
             human_idx = np.arange(sum(num_human))
@@ -405,7 +406,7 @@ class SceneManager(object):
     #                 human.sample_random_attributes()
     #             human.set(*pos, *goal, 0, 0)
     #             humans.append(human)
-    #         # logging.info(f"spawn humans at {spawn_pos}, {len(humans)},{size}")
+    #         # logging_info(f"spawn humans at {spawn_pos}, {len(humans)},{size}")
     #         if len(humans) == size:
     #             return humans
 

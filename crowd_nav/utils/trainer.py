@@ -1,4 +1,4 @@
-import logging
+from crowd_sim.envs.utils.logging import logging_info, logging_debug
 import copy
 from abc import ABC, abstractmethod
 
@@ -9,7 +9,6 @@ from torch.optim import optimizer
 from torch.utils.data import DataLoader
 
 from tqdm import tqdm
-from crowd_sim.envs.utils.utils import logging_debug
 
 
 class Trainer(ABC):
@@ -42,7 +41,7 @@ class Trainer(ABC):
             ),
         }
         self.optimizer = optimizers.get(self.optimizer_name)
-        logging.info(
+        logging_info(
             "Lr: {}  with {} optimizer for parameters [{}]".format(
                 learning_rate,
                 " ".join(
@@ -90,7 +89,7 @@ class PPOTrainer(Trainer):
                 if len(data) == 4:  # regular
                     inputs, values, _, _ = data
                 # elif len(data) = 6: # PPO
-                #     inputs
+                #     inputs, values, log_probs
                 inputs = Variable(inputs)
                 values = Variable(values)
 
@@ -109,10 +108,53 @@ class PPOTrainer(Trainer):
             )
             epoch_loop.set_postfix(loss=average_epoch_loss)
             logging_debug(
-                "Average loss in epoch %d: %.2E", epoch, average_epoch_loss
+                "Average loss in epoch %d: %.2E".format(
+                    epoch, average_epoch_loss
+                )
             )
 
         return average_epoch_loss
+
+    def optimize_batch(self, num_batches, episode=None):
+        if self.optimizer is None:
+            raise ValueError("Learning rate is not set!")
+        if self.data_loader is None:
+            self.data_loader = DataLoader(
+                self.memory, self.batch_size, shuffle=True
+            )
+        losses = 0
+        pbar = tqdm(
+            self.data_loader, total=num_batches, leave=False, colour="green"
+        )
+        # batch_count = 0
+        for batch_count, (inputs, values, rewards, next_states) in enumerate(
+            pbar
+        ):
+            inputs = Variable(inputs)
+            values = Variable(values)
+
+            self.optimizer.zero_grad()
+            outputs = self.model(inputs)
+
+            gamma_bar = pow(self.gamma, self.time_step * self.v_pref)
+            target_values = rewards + gamma_bar * self.target_model(next_states)
+
+            loss = self.criterion(outputs, target_values)
+            loss.backward()
+            self.optimizer.step()
+            losses += loss.data.item()
+
+            pbar.set_description(f"Episode [{episode}]")
+            pbar.set_postfix(loss=loss.data.item())
+
+            if batch_count > num_batches:
+                break
+
+        average_loss = losses / num_batches
+        self.writer.add_scalar("RL/average_loss", average_loss, episode)
+        logging_debug("Average loss : %.2E".format(average_loss))
+
+        return average_loss
 
 
 class VNRLTrainer(Trainer):
