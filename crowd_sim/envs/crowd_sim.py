@@ -652,7 +652,7 @@ class CrowdSim(gym.Env):
                 ax.plot(ob[:2], ob[2:4], "-o", color="black", markersize=2.5)
 
             # add human start positions and goals
-            human_colors = [cmap(i) for i in range(len(self.humans))]
+            human_colors = [cmap(i) for i, _ in enumerate(self.humans)]
             for i, human in enumerate(self.humans):
                 human = self.humans[i]
                 human_goal = mlines.Line2D(
@@ -682,7 +682,7 @@ class CrowdSim(gym.Env):
                 for i in range(len(self.states))
             ]
 
-            for k in range(len(self.states)):
+            for k, _ in enumerate(self.states):
                 if k % 4 == 0 or k == len(self.states) - 1:
                     robot = plt.Circle(
                         robot_positions[k],
