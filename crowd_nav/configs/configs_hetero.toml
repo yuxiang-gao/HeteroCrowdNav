@@ -40,9 +40,6 @@ goal_radius = 0.3
     phase.train = "cocktail_party"
     phase.val = "cocktail_party"
     phase.test = "cocktail_party"
-    human_num = [2, 3]
-    perpetual = false
-    centralized_planning = false
     map_size = [10, 10]
 
         [env.scenarios.cocktail_party]
@@ -75,6 +72,9 @@ goal_radius = 0.3
 
 
     [env.agents]
+    human_num = [2, 3]
+    perpetual = false
+    centralized_planning = false
     use_groups = false
     use_types = true
 
@@ -147,7 +147,7 @@ randomize_attributes = false # orca config
 
 
     [policy.action_space]
-    kinematics = "holonomic"
+    kinematics = "differential"
     # action space size is speed_samples * rotation_samples + 1
     speed_samples = 5
     rotation_samples = 16

@@ -28,29 +28,33 @@ from crowd_sim.envs.utils.scenarios import (
 
 EPISODE_INFO_TEMPLATE = """
 title = "Episode info"
+global_time = 0
+[rewards]
 time = 0
 collisions = 0
 obstacle_collisions = 0
+discomfort = 0
 progress = 0
 goal = 0
 
-    [events]
-    timeout = 0
-    collision = 0
-    obstacle_collision = 0
-    succeed = 0
-    discomfort = 0
-    min_dist = []   
+[events]
+nothing = 0
+timeout = 0
+collision = 0
+obstacle_collision = 0
+succeed = 0
+discomfort = 0
+min_dist = []   
 
-    [robot]
-    distance_traversed = []
-    velocity = []
-    
-    [[pedestrians]]
-    id = -1
-    goal = []
-    velocity = []
-    distance_traversed = []
+[robot]
+distance_traversed = []
+velocity = []
+
+[[humans]]
+id = -1
+goal = []
+velocity = []
+distance_traversed = []
 """
 logger = logging.getLogger(__name__)
 
@@ -159,8 +163,8 @@ class CrowdSim(gym.Env):
         # discomfort_scale = 1.0
         # discomfort_dist = 0.2
 
-        self.perpetual = config("scenarios", "perpetual")
-        self.human_num = config("scenarios", "human_num")
+        self.perpetual = config("agents", "perpetual")
+        self.human_num = config("agents", "human_num")
 
         human_policy = self.agent_config("humans")[0]["policy"]
         if self.centralized_planning:
@@ -260,6 +264,9 @@ class CrowdSim(gym.Env):
                 self.group_membership,
                 self.individual_membership,
             ) = self.scene_manager.get_scene()
+
+            self.obstacle_vertices = self.scene_manager.get_obstacle_polygon()
+
             self.num_groups = len(self.group_membership)
 
             # case_counter is always between 0 and case_size[phase]
@@ -343,8 +350,8 @@ class CrowdSim(gym.Env):
         # init episode_info
         human_num = len(self.humans)
         for i in range(human_num - 1):
-            self.episode_info["pedestrians"].append(
-                deepcopy(self.episode_info["pedestrians"][0])
+            self.episode_info["humans"].append(
+                deepcopy(self.episode_info["humans"][0])
             )
 
         # Initiate forces log
@@ -384,16 +391,11 @@ class CrowdSim(gym.Env):
                 human_actions.append(human.act(human_ob, self.group_membership))
         # collision detection
         collisions, human_distances = self.detect_collisions_with_human(action)
-        self.episode_info["collisions"] -= self.collision_penalty * collisions
-
         # collision detection between robot and static obstacle
         (
             obstacle_collisions,
             obstacle_distances,
         ) = self.detect_collisions_with_obstacles(action)
-        self.episode_info["obstacle_collisions"] -= (
-            self.static_obstacle_collision_penalty * obstacle_collisions
-        )
 
         # collision detection between humans
         human_num = len(self.humans)
@@ -419,7 +421,7 @@ class CrowdSim(gym.Env):
         )
 
         done = False
-        info = Nothing()
+        # info = Nothing()
         reward = -self.time_penalty
         goal_distance = np.linalg.norm(
             [
@@ -430,44 +432,57 @@ class CrowdSim(gym.Env):
         progress = self.previous_distance - goal_distance
         self.previous_distance = goal_distance
         reward += self.progress_reward * progress
-        self.episode_info["progress"] += self.progress_reward * progress
+        self.episode_info["rewards"]["progress"] += (
+            self.progress_reward * progress
+        )
 
+        # clear previous events
+        self.episode_info["events"]["nothing"] = 0.0
+        if not self.end_on_collision:
+            self.episode_info["events"]["collision"] = 0.0
+            self.episode_info["events"]["obstacle_collision"] = 0.0
         if self.global_time >= self.time_limit:
             done = True
-            info = Timeout()
+            # info = Timeout()
             self.episode_info["events"]["timeout"] = 1.0
         elif collisions > 0:
-            reward -= self.collision_penalty * collisions
+            collision_reward = self.collision_penalty * collisions
+            reward -= collision_reward
+            # info = Collision()
+            self.episode_info["events"]["collision"] = 1.0
+            self.episode_info["rewards"]["collisions"] -= collision_reward
             if self.end_on_collision:
                 done = True
-            info = Collision()
-            self.episode_info["events"]["collision"] = 1.0
         elif obstacle_collisions > 0:
-            reward -= (
+            ob_collision_reward = (
                 self.static_obstacle_collision_penalty * obstacle_collisions
             )
+            reward -= ob_collision_reward
+            # info = Collision()
+            self.episode_info["events"]["obstacle_collision"] = 1.0
+            self.episode_info["rewards"][
+                "obstacle_collisions"
+            ] -= ob_collision_reward
             if self.end_on_collision:
                 done = True
-            info = Collision()
-            self.episode_info["events"]["obstacle_collision"] = 1.0
         elif reaching_goal:
             reward += self.success_reward
             done = True
-            info = ReachGoal()
-            self.episode_info["goal"] = self.success_reward
+            # info = ReachGoal()
             self.episode_info["events"]["succeed"] = 1.0
+            self.episode_info["rewards"]["goal"] = self.success_reward
         elif (
             len(human_distances) > 0
             and 0
             <= min(human_distances)
             < self.discomfort_dist * self.discomfort_scale
         ):
-            info = Discomfort(min(human_distances))
+            # info = Discomfort(min(human_distances))
             self.episode_info["events"]["discomfort"] += 1
             self.episode_info["events"]["min_dist"].append(min(human_distances))
-
         else:
-            info = Nothing()
+            # info = Nothing()
+            self.episode_info["events"]["nothing"] = 1.0
 
         for human_dist in human_distances:
             if 0 <= human_dist < self.discomfort_dist * self.discomfort_scale:
@@ -477,30 +492,31 @@ class CrowdSim(gym.Env):
                     * self.time_step
                 )
                 reward += discomfort
-                self.episode_info["events"]["discomfort"] += discomfort
+                self.episode_info["rewards"]["discomfort"] += discomfort
 
         # Record episode info
-        human_num = len(self.humans)
-        for i in range(human_num):
-            human_pos = [self.humans[i].px, self.humans[i].py]
-            human_goal = [self.humans[i].gx, self.humans[i].gy]
-            self.episode_info["pedestrians"][i]["id"] = self.humans[i].id
-            self.episode_info["pedestrians"][i]["distance_traversed"].append(
-                human_pos
-            )
-            self.episode_info["pedestrians"][i]["goal"].append(human_goal)
+        # human_num = len(self.humans)
+        # for i in range(human_num):
+        #     human_pos = [self.humans[i].px, self.humans[i].py]
+        #     human_goal = [self.humans[i].gx, self.humans[i].gy]
+        #     self.episode_info["humans"][i]["id"] = self.humans[i].id
+        #     self.episode_info["humans"][i]["distance_traversed"].append(
+        #         human_pos
+        #     )
+        #     self.episode_info["humans"][i]["goal"].append(human_goal)
 
-            self.episode_info["pedestrians"][i]["velocity"].append(
-                [action.vx, action.vy]
-            )  # holonomic
+        #     self.episode_info["humans"][i]["velocity"].append(
+        #         action
+        #     )  # holonomic
 
-        robot_pos = [self.robot.px, self.robot.py]
-        robot_vel = [self.robot.vx, self.robot.vy]
-        self.episode_info["robot"]["distance_traversed"].append(robot_pos)
-        self.episode_info["robot"]["velocity"].append(robot_vel)
+        # robot_pos = [self.robot.px, self.robot.py]
+        # robot_vel = [self.robot.vx, self.robot.vy]
+        # self.episode_info["robot"]["distance_traversed"].append(robot_pos)
+        # self.episode_info["robot"]["velocity"].append(robot_vel)
 
         if update:
-            # update all agents            self.robot.step(action)
+            # update all agents
+            self.robot.step(action)
             for human, action in zip(self.humans, human_actions):
                 human.step(action)
             self.global_time += self.time_step
@@ -523,7 +539,7 @@ class CrowdSim(gym.Env):
                 [
                     self.robot.get_full_state(),
                     [human.get_full_state() for human in self.humans],
-                    [human.id for human in self.humans],
+                    [human.type_idx for human in self.humans],
                 ]
             )
             # self.robot_actions.append(action)
@@ -544,13 +560,11 @@ class CrowdSim(gym.Env):
                 raise NotImplementedError
 
         if done:
-            self.episode_info["time"] = (
+            self.episode_info["rewards"]["time"] = (
                 -self.global_time * self.time_penalty / self.time_step
             )
             self.episode_info["global_time"] = self.global_time
-            info = (
-                self.episode_info
-            )  # Return full episode information at the end
+        info = self.episode_info  # Return full episode information at the end
         return ob, reward, done, info
 
     def compute_observation_for(self, agent):
@@ -619,12 +633,20 @@ class CrowdSim(gym.Env):
             vy = action.v * np.sin(action.r + self.robot.theta)
         ex = px + vx * self.time_step
         ey = py + vy * self.time_step
-        for i, obstacle in enumerate(self.obstacles):
-            robot_position = ex, ey
-            obst_dist = line_distance(obstacle, robot_position)
-            if obst_dist < min_dist:
-                static_obstacle_collision += 1
-                break
+        # for i, obstacle in enumerate(self.obstacles):
+        #     robot_position = ex, ey
+        #     obst_dist = line_distance(obstacle, robot_position)
+        #     if obst_dist < min_dist:
+        #         static_obstacle_collision += 1
+        #         break
+
+        for poly in self.obstacle_vertices:
+            for pt1, pt2 in zip(poly[1:], poly[:-1]):
+                obst_dist = point_to_segment_dist(*pt1, *pt2, ex, ey)
+                if obst_dist < min_dist:
+                    static_obstacle_collision += 1
+                    break
+
         return static_obstacle_collision, obstacle_distances
 
     def render(self, mode="video", output_file=None):

@@ -81,42 +81,41 @@ class PPOTrainer(Trainer):
         average_epoch_loss = 0
         epoch_loop = tqdm(range(num_epochs), desc="Imitate", colour="blue")
 
-        for epoch in epoch_loop:
-            epoch_loss = 0
-            data_loop = tqdm(
-                self.data_loader,
-                desc=f"Epoch [{epoch}/{num_epochs}]",
-                colour="green",
-                leave=False,
-            )
-            with logging_redirect_tqdm():
-                for data in data_loop:
-                    if len(data) == 4:  # regular
-                        inputs, values, _, _ = data
-                    # elif len(data) = 6: # PPO
-                    #     inputs, values, log_probs
-                    inputs = Variable(inputs)
-                    values = Variable(values)
-
-                    self.optimizer.zero_grad()
-                    outputs = self.model(inputs)
-                    loss = self.criterion(outputs, values)
-                    loss.backward()
-                    self.optimizer.step()
-                    epoch_loss += loss.data.item()
-                    # pbar.set_description(f"Epoch [{epoch}/{num_epochs}]")
-                    data_loop.set_postfix(loss=loss.data.item())
-
-            average_epoch_loss = epoch_loss / len(self.memory)
-            self.writer.add_scalar(
-                "IL/average_epoch_loss", average_epoch_loss, epoch
-            )
-            epoch_loop.set_postfix(loss=average_epoch_loss)
-            logger.debug(
-                "Average loss in epoch %d: %.2E".format(
-                    epoch, average_epoch_loss
+        with logging_redirect_tqdm():
+            for epoch in epoch_loop:
+                epoch_loss = 0
+                data_loop = tqdm(
+                    self.data_loader,
+                    desc=f"Epoch [{epoch}/{num_epochs}]",
+                    colour="green",
+                    leave=False,
                 )
-            )
+                with logging_redirect_tqdm():
+                    for data in data_loop:
+                        if len(data) == 4:  # regular
+                            inputs, values, _, _ = data
+                        # elif len(data) = 6: # PPO
+                        #     inputs, values, log_probs
+                        inputs = Variable(inputs)
+                        values = Variable(values)
+
+                        self.optimizer.zero_grad()
+                        outputs = self.model(inputs)
+                        loss = self.criterion(outputs, values)
+                        loss.backward()
+                        self.optimizer.step()
+                        epoch_loss += loss.data.item()
+                        # pbar.set_description(f"Epoch [{epoch}/{num_epochs}]")
+                        data_loop.set_postfix(loss=loss.data.item())
+
+                average_epoch_loss = epoch_loss / len(self.memory)
+                self.writer.add_scalar(
+                    "IL/average_epoch_loss", average_epoch_loss, epoch
+                )
+                epoch_loop.set_postfix(loss=average_epoch_loss)
+                logger.debug(
+                    f"Average loss in epoch {epoch:d}: {average_epoch_loss:.2E}"
+                )
 
         return average_epoch_loss
 
@@ -162,7 +161,7 @@ class PPOTrainer(Trainer):
 
         average_loss = losses / num_batches
         self.writer.add_scalar("RL/average_loss", average_loss, episode)
-        logger.debug("Average loss : %.2E".format(average_loss))
+        logger.debug("Average loss : %.2E", average_loss)
 
         return average_loss
 
@@ -192,38 +191,37 @@ class VNRLTrainer(Trainer):
             )
         average_epoch_loss = 0
         epoch_loop = tqdm(range(num_epochs), desc="Imitate", colour="blue")
-        for epoch in epoch_loop:
-            epoch_loss = 0
-            data_loop = tqdm(
-                self.data_loader,
-                desc=f"Epoch [{epoch}/{num_epochs}]",
-                colour="green",
-                leave=False,
-            )
-            with logging_redirect_tqdm():
-                for inputs, values, _, _ in data_loop:
-                    inputs = Variable(inputs)
-                    values = Variable(values)
-
-                    self.optimizer.zero_grad()
-                    outputs = self.model(inputs)
-                    loss = self.criterion(outputs, values)
-                    loss.backward()
-                    self.optimizer.step()
-                    epoch_loss += loss.data.item()
-                    # pbar.set_description(f"Epoch [{epoch}/{num_epochs}]")
-                    data_loop.set_postfix(loss=loss.data.item())
-
-            average_epoch_loss = epoch_loss / len(self.memory)
-            self.writer.add_scalar(
-                "IL/average_epoch_loss", average_epoch_loss, epoch
-            )
-            epoch_loop.set_postfix(loss=average_epoch_loss)
-            logger.debug(
-                "Average loss in epoch %d: %.2E".format(
-                    epoch, average_epoch_loss
+        with logging_redirect_tqdm():
+            for epoch in epoch_loop:
+                epoch_loss = 0
+                data_loop = tqdm(
+                    self.data_loader,
+                    desc=f"Epoch [{epoch}/{num_epochs}]",
+                    colour="green",
+                    leave=False,
                 )
-            )
+                with logging_redirect_tqdm():
+                    for inputs, values, _, _ in data_loop:
+                        inputs = Variable(inputs)
+                        values = Variable(values)
+
+                        self.optimizer.zero_grad()
+                        outputs = self.model(inputs)
+                        loss = self.criterion(outputs, values)
+                        loss.backward()
+                        self.optimizer.step()
+                        epoch_loss += loss.data.item()
+                        # pbar.set_description(f"Epoch [{epoch}/{num_epochs}]")
+                        data_loop.set_postfix(loss=loss.data.item())
+
+                average_epoch_loss = epoch_loss / len(self.memory)
+                self.writer.add_scalar(
+                    "IL/average_epoch_loss", average_epoch_loss, epoch
+                )
+                epoch_loop.set_postfix(loss=average_epoch_loss)
+                logger.debug(
+                    "Average loss in epoch %d: %.2E", epoch, average_epoch_loss
+                )
 
         return average_epoch_loss
 
@@ -269,6 +267,6 @@ class VNRLTrainer(Trainer):
 
         average_loss = losses / num_batches
         self.writer.add_scalar("RL/average_loss", average_loss, episode)
-        logger.debug("Average loss : %.2E".format(average_loss))
+        logger.debug(f"Average loss : {average_loss:.2E}")
 
         return average_loss
