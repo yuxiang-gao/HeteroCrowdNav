@@ -7,7 +7,7 @@ class Linear(Policy):
     def __init__(self):
         super().__init__()
         self.trainable = False
-        self.kinematics = "holonomic"
+        self.kinematics = "nonholonomic"
         self.multiagent_training = True
 
     def configure(self, config):

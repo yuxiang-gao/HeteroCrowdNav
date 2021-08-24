@@ -14,6 +14,7 @@ from pose2d import apply_tf_to_vel, inverse_pose2d, apply_tf_to_pose
 from crowd_sim.envs.crowd_sim import CrowdSim
 from crowd_sim.envs.utils.robot import Robot
 from crowd_sim.envs.utils.action import ActionRot, ActionXY
+from crowd_sim.envs.utils.state import ObservableState
 from crowd_nav.policy.policy_factory import policy_factory
 
 logger = logging.getLogger(__name__)
@@ -32,8 +33,11 @@ class CrowdEnv(gym.Env):
         self.total_steps = 0
         self.steps_since_reset = None
         self.episode_reward = None
+        self.obstacles_as_agent = None
 
         self.sim, self.robot = self._make_env()
+        self.sim.reset()
+        self.obstacles_as_agent = self._obstacle_observation()
 
         self.kinematics = self.config("policy", "action_space", "kinematics")
         self.speed_samples = self.config(
@@ -54,7 +58,7 @@ class CrowdEnv(gym.Env):
         self.observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(sum(self.num_human) * 13,),
+            shape=((sum(self.num_human) + len(self.obstacles_as_agent)), 13),
             dtype=np.float32,
         )  # gx, gy, vx, vy, v_pref, theta, radius, px1, py1, vx1,vy1, radius1, role
 
@@ -71,6 +75,7 @@ class CrowdEnv(gym.Env):
         self.steps_since_reset += 1
         self.total_steps += 1
         time_step = self.sim.time_step
+        # print([(h.id, h.px, h.py, h.gx, h.gy) for h in self.sim.humans])
 
         if (
             isinstance(action, tuple)
@@ -86,6 +91,7 @@ class CrowdEnv(gym.Env):
 
         _, reward, done, info = self.sim.step(input_action)
         obs = self._convert_obs()
+        self.episode_reward = reward
 
         return obs, reward, done, info
 
@@ -108,37 +114,71 @@ class CrowdEnv(gym.Env):
         robot.print_info()
         return env, robot
 
-    def _convert_obs(self):
+    def _convert_obs(self, flatten=False):
         robot = self.sim.robot
         humans = self.sim.humans
         robot_state = (
             robot.get_full_state()
         )  # 'px', 'py', 'vx', 'vy', 'radius', 'gx', 'gy', 'v_pref', 'theta'
+        gx, gy, vx, vy, vr = self._convert_agent_obs(robot_state)
+        robot_ob = [
+            gx,
+            gy,
+            vx,
+            vy,
+            robot_state.theta,
+            robot_state.v_pref,
+            robot_state.radius,
+        ]
+
         obs = []
-        for human in humans:
-            state = (
-                human.get_observable_state()
-            )  #'px1', 'py1', 'vx1', 'vy1', 'radius1'
-            gx, gy, vx, vy, vr = self._convert_agent_obs(robot_state)
-            robot_ob = [
-                gx,
-                gy,
-                vx,
-                vy,
-                robot_state.theta,
-                robot_state.v_pref,
-                robot_state.radius,
-            ]
+        for agent in humans:
+            #'px1', 'py1', 'vx1', 'vy1', 'radius1'
             human_ob = [
-                human.px - robot_state.px,
-                human.py - robot_state.py,
-                human.vx - robot_state.vx,
-                human.vy - robot_state.vy,
-                human.radius,
-                human.type_idx,
+                agent.px - robot_state.px,
+                agent.py - robot_state.py,
+                agent.vx - robot_state.vx,
+                agent.vy - robot_state.vy,
+                agent.radius,
+                agent.type_idx,
             ]
             obs.append(robot_ob + human_ob)
-        return np.array(obs).flatten()
+        for obstacle in self.obstacles_as_agent:
+            obstacle_ob = [
+                obstacle.px - robot_state.px,
+                obstacle.py - robot_state.py,
+                obstacle.vx - robot_state.vx,
+                obstacle.vy - robot_state.vy,
+                obstacle.radius,
+                -1,
+            ]
+            obs.append(robot_ob + obstacle_ob)
+        if flatten:
+            obs = np.array(obs).flatten()
+        else:
+            obs = np.array(obs)
+        return obs
+
+    def _obstacle_observation(self):
+        obstacles_as_pedestrians = []
+        for i, ob in enumerate(self.sim.obstacle_vertices):
+            if abs(ob[0][1] - ob[2][1]) == abs(ob[0][0] - ob[2][0]):
+                px = (ob[0][0] + ob[2][0]) / 2.0
+                py = (ob[0][1] + ob[2][1]) / 2.0
+                radius = (ob[0][0] - px) * np.sqrt(2)
+                obstacles_as_pedestrians.append(
+                    ObservableState(px, py, 0, 0, radius)
+                )
+            else:
+                py = (ob[0][1] + ob[2][1]) / 2.0
+                radius = (ob[0][1] - py) * np.sqrt(2)
+                px = ob[1][0] + radius
+                while px <= ob[0][0]:
+                    obstacles_as_pedestrians.append(
+                        ObservableState(px, py, 0, 0, radius)
+                    )
+                    px = px + 2 * radius
+        return obstacles_as_pedestrians
 
     @staticmethod
     def _convert_agent_obs(agent):
@@ -193,6 +233,7 @@ class CrowdEnv(gym.Env):
         goal_override=None,
         save_to_file=False,
         show_score=False,
+        show_label=False,
         robocentric=False,
     ):
         if close:
@@ -203,20 +244,24 @@ class CrowdEnv(gym.Env):
             self.sim.render(mode)
         elif mode in ["human"]:
             # Window and viewport size
-            WINDOW_W = 256
-            WINDOW_H = 256
-            VP_W = WINDOW_W
-            VP_H = WINDOW_H
+            WINDOW_W, WINDOW_H = (256, 256)
+            SCALE = 2
+            VP_W = WINDOW_W * SCALE
+            VP_H = WINDOW_H * SCALE
             from gym.envs.classic_control import rendering
             import pyglet
             from pyglet import gl
 
             # Create viewer
             if self.viewer is None:
-                self.viewer = rendering.Viewer(WINDOW_W, WINDOW_H)
+                self.viewer = rendering.Viewer(
+                    WINDOW_W * SCALE, WINDOW_H * SCALE
+                )
                 self.transform = rendering.Transform()
-                self.transform.set_scale(10, 10)
-                self.transform.set_translation(128, 128)
+                self.transform.set_scale(10 * SCALE, 10 * SCALE)
+                self.transform.set_translation(
+                    WINDOW_W * SCALE / 2, WINDOW_H * SCALE / 2
+                )
                 self.score_label = pyglet.text.Label(
                     "0000",
                     font_size=12,
@@ -226,6 +271,19 @@ class CrowdEnv(gym.Env):
                     anchor_y="center",
                     color=(255, 255, 255, 255),
                 )
+                self.human_label = []
+                for n, human in enumerate(self.sim.humans):
+                    self.human_label.append(
+                        pyglet.text.Label(
+                            str(human.id) + "-" + human.role,
+                            x=0,
+                            y=0,
+                            font_size=12,
+                            anchor_x="center",
+                            anchor_y="center",
+                            color=(255, 255, 255, 255),
+                        )
+                    )
                 #                 self.transform = rendering.Transform()
                 self.currently_rendering_iteration = 0
                 self.image_lock = threading.Lock()
@@ -364,6 +422,20 @@ class CrowdEnv(gym.Env):
                 if show_score:
                     self.score_label.text = "R {}".format(self.episode_reward)
                 self.score_label.draw()
+                if show_label:
+                    for n, human in enumerate(self.sim.humans):
+                        gl.glPushMatrix()
+                        gl.glTranslatef(
+                            WINDOW_W * SCALE / 2, WINDOW_H * SCALE / 2, 0.0
+                        )
+                        gl.glRotatef(0.0, 0.0, 0.0, 1.0)
+                        self.human_label[n].x = human.px * 10 * SCALE
+                        self.human_label[n].y = human.py * 10 * SCALE
+                        self.human_label[n].draw()
+                        gl.glPopMatrix()
+                # # human labels
+                # for n, human in enumerate(self.sim.humans):
+                #     self.human_label[n].draw()
                 win.flip()
                 if save_to_file:
                     pyglet.image.get_buffer_manager().get_color_buffer().save(

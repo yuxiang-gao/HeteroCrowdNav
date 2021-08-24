@@ -5,6 +5,7 @@ description = "Robot navigation in heterogeneous crowds"
 authors = ["Yuxiang Gao <yuxiang.gao@jhu.edu>"]
 packages = [
     { include = "crowd_nav" },
+    { include = "hetero_crowd_nav" },
     { include = "crowd_sim" }
 ]
 
