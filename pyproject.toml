@@ -24,6 +24,10 @@ torch-tb-profiler = "^0.2.1"
 socialforce = { git = "https://github.com/ChanganVR/socialforce.git" }
 pysocialforce = { git = "https://github.com/yuxiang-gao/pysocialforce.git" }
 pyrvo2 = { path = "thirdparty/pyrvo2" }
+stable-baselines3 = "^1.1.0"
+pandas = "^1.3.2"
+pymap2d = {git = "https://github.com/danieldugas/pymap2d"}
+pyglet = "1.5.15"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.9.6"

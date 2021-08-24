@@ -294,6 +294,9 @@ class SceneManager(object):
     def get_obstacles(self):
         return self.scenario_manager.obstacles
 
+    def get_obstacle_polygon(self):
+        return self.scenario_manager.polygon_obstacles
+
     def get_map_size(self):
         return self.scenario_manager.map_size
 
