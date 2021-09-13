@@ -470,7 +470,7 @@ class CrowdSim(gym.Env):
             done = True
             # info = ReachGoal()
             self.episode_info["events"]["succeed"] = 1.0
-            self.episode_info["rewards"]["goal"] = self.success_reward
+            self.episode_info["rewards"]["goal"] += self.success_reward
         elif (
             len(human_distances) > 0
             and 0
