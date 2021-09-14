@@ -113,6 +113,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default="data/PPO/best_model.zip")
     parser.add_argument("-n", "--num_episodes", type=int, default=500)
     parser.add_argument("-v", "--verbose", type=int, default=1)
+    parser.add_argument("-r", "--render", action="store_true")
     args = parser.parse_args()
 
     config = Config(args.config)
@@ -120,4 +121,4 @@ if __name__ == "__main__":
     eval_env = CrowdEnv(config, "test")
     # eval_env = Monitor(eval_env, LOG_DIR + "/test", allow_early_resets=True)
 
-    run_test(model, eval_env, args.num_episodes)
+    run_test(model, eval_env, args.num_episodes, args.render)

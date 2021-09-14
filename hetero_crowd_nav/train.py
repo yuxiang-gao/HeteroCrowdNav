@@ -47,26 +47,32 @@ if __name__ == "__main__":
     args = parser.parse_args()
     config = Config(args.config)
 
-    LOG_DIR = args.output_dir
+    LOG_DIR = Path(args.output_dir)
     VERBOSE = args.verbose
 
-    logger = configure(LOG_DIR, ["log", "json", "tensorboard"])
+    logger = configure(str(LOG_DIR), ["log", "json", "tensorboard"])
 
     eval_env = CrowdEnv(config, "val")
-    eval_env = Monitor(eval_env, LOG_DIR + "/eval", allow_early_resets=True)
+    eval_env = Monitor(
+        eval_env,
+        str(Path(LOG_DIR, "eval")),
+        allow_early_resets=True,
+    )
     eval_callback = EvalCallback(
         eval_env,
         n_eval_episodes=5,
         eval_freq=10000,
-        log_path=LOG_DIR + "/eval/",
-        best_model_save_path=LOG_DIR + "/eval/",
+        log_path=str(Path(LOG_DIR, "eval")),
+        best_model_save_path=str(Path(LOG_DIR, "eval")),
         verbose=VERBOSE,
     )
     checkpoint_callback = CheckpointCallback(
-        save_freq=10000, save_path=LOG_DIR + "/ckpt"
+        save_freq=10000,
+        save_path=str(Path(LOG_DIR, "ckpt")),
+        name_prefix="ckpt_",
     )
     save_best_callback = SaveOnBestTrainingRewardCallback(
-        check_freq=1000, log_dir=LOG_DIR, verbose=VERBOSE
+        check_freq=1000, log_dir=str(LOG_DIR), verbose=VERBOSE
     )
     ts_callback = TensorboardCallback(VERBOSE)
     callback = CallbackList(
@@ -74,7 +80,7 @@ if __name__ == "__main__":
     )
 
     env = CrowdEnv(config, "train")
-    env = Monitor(env, LOG_DIR + "/train", allow_early_resets=True)
+    env = Monitor(env, str(Path(LOG_DIR, "train")), allow_early_resets=True)
     env = DummyVecEnv([lambda: env] * 8)
     # env = Monitor(CrowdEnv(config, "test"))
     network_dims = dict(
@@ -92,12 +98,17 @@ if __name__ == "__main__":
         "MlpPolicy",
         env,
         policy_kwargs=policy_kwargs,
+        learning_rate=2.5e-4,
+        gamma=0.99,
+        gae_lambda=0.95,
         n_steps=16,
         n_epochs=4,
+        batch_size=128,
         clip_range=0.1,
         vf_coef=0.5,
         ent_coef=0.01,
         verbose=0,
+        seed=2021,
         tensorboard_log=LOG_DIR,
     )
 
@@ -107,4 +118,4 @@ if __name__ == "__main__":
         total_timesteps=args.num_timestep,
         callback=callback,
     )
-    model.save(LOG_DIR + "model")
+    model.save(Path(LOG_DIR, "model"))
