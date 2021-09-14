@@ -150,7 +150,7 @@ randomize_attributes = false # orca config
     kinematics = "differential"
     # action space size is speed_samples * rotation_samples + 1
     speed_samples = 5
-    rotation_samples = 16
+    rotation_samples = 6
     sampling = "exponential"
     query_env = true
 

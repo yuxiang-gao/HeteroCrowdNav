@@ -1,6 +1,7 @@
 import enum
 import logging
 import threading
+from pathlib import Path
 
 import gym
 from gym import spaces
@@ -15,6 +16,7 @@ from crowd_sim.envs.crowd_sim import CrowdSim
 from crowd_sim.envs.utils.robot import Robot
 from crowd_sim.envs.utils.action import ActionRot, ActionXY
 from crowd_sim.envs.utils.state import ObservableState
+from crowd_sim.envs.utils.config import Config
 from crowd_nav.policy.policy_factory import policy_factory
 
 logger = logging.getLogger(__name__)
@@ -24,10 +26,13 @@ gym.logger.set_level(40)
 class CrowdEnv(gym.Env):
     metadata = {"render.modes": ["human", "traj", "video"]}
 
-    def __init__(self, config, phase="test") -> None:
+    def __init__(self, conf=None, phase="train") -> None:
         super(CrowdEnv, self).__init__()
+        if isinstance(conf, str) or isinstance(conf, Path):
+            self.config = Config(conf)
+        elif isinstance(conf, Config):
+            self.config = config
         self.phase = phase
-        self.config = config
         self.sim = None
         self.robot = None
         self.total_steps = 0
@@ -46,19 +51,22 @@ class CrowdEnv(gym.Env):
         self.rotation_samples = self.config(
             "policy", "action_space", "rotation_samples"
         )
-        self.rotation_constraint = np.pi / 3
+        self.rotation_constraint = 10 / 180 * np.pi
         self.num_human = self.config("env", "agents", "human_num")
         x_lim, y_lim = self.config("env", "scenarios", "map_size")
+        self._build_action_space(1.2)
 
         # self.action_space = spaces.Box(
         #     low=-1, high=1, shape=(2,), dtype=np.float32
         # )  # vel, rot
-        self.action_space = spaces.Discrete(81)
-        self._build_action_space(1.2)
+        self.action_space = spaces.Discrete(len(self.action_spaces))
         self.observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=((sum(self.num_human) + len(self.obstacles_as_agent)), 15),
+            shape=(
+                (sum(self.num_human) + len(self.obstacles_as_agent)),
+                7 + 5 + 3,
+            ),
             dtype=np.float32,
         )  # gx, gy, vx, vy, v_pref, theta, radius, px1, py1, vx1,vy1, radius1, role_onehot (obstacles, waiter, guest)
 
@@ -76,7 +84,6 @@ class CrowdEnv(gym.Env):
         self.total_steps += 1
         time_step = self.sim.time_step
         # print([(h.id, h.px, h.py, h.gx, h.gy) for h in self.sim.humans])
-
         if (
             isinstance(action, tuple)
             or isinstance(action, list)
@@ -204,6 +211,7 @@ class CrowdEnv(gym.Env):
             (np.exp((i + 1) / self.speed_samples) - 1) / (np.e - 1) * v_pref
             for i in range(self.speed_samples)
         ]
+        speeds = [-s for s in reversed(speeds)] + [0] + speeds
         if holonomic:
             rotations = np.linspace(
                 0, 2 * np.pi, self.rotation_samples, endpoint=False
@@ -215,7 +223,8 @@ class CrowdEnv(gym.Env):
                 self.rotation_samples,
             )
 
-        action_space = [ActionXY(0, 0) if holonomic else ActionRot(0, 0)]
+        # action_space = [ActionXY(0, 0) if holonomic else ActionRot(0, 0)]
+        action_space = []
         for rotation, speed in itertools.product(rotations, speeds):
             if holonomic:
                 action_space.append(

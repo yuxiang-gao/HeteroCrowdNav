@@ -4,6 +4,7 @@ import logging
 import argparse
 from pathlib import Path
 from copy import deepcopy
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch as th
 import gym
@@ -35,6 +36,28 @@ from hetero_crowd_nav.utils.callbacks import (
     TensorboardCallback,
 )
 
+# https://github.com/DLR-RM/rl-baselines3-zoo/blob/master/utils/utils.py
+def linear_schedule(
+    initial_value: Union[float, str]
+) -> Callable[[float], float]:
+    """
+    Linear learning rate schedule.
+    :param initial_value: (float or str)
+    :return: (function)
+    """
+    if isinstance(initial_value, str):
+        initial_value = float(initial_value)
+
+    def func(progress_remaining: float) -> float:
+        """
+        Progress will decrease from 1 (beginning) to 0
+        :param progress_remaining: (float)
+        :return: (float)
+        """
+        return progress_remaining * initial_value
+
+    return func
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Parse configuration file")
@@ -45,14 +68,14 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--num_timestep", type=int, default=1_000_000)
     parser.add_argument("-v", "--verbose", type=int, default=1)
     args = parser.parse_args()
-    config = Config(args.config)
+    # config = Config(args.config)
 
     LOG_DIR = Path(args.output_dir)
     VERBOSE = args.verbose
 
     logger = configure(str(LOG_DIR), ["log", "json", "tensorboard"])
 
-    eval_env = CrowdEnv(config, "val")
+    eval_env = CrowdEnv(args.config)
     eval_env = Monitor(
         eval_env,
         str(Path(LOG_DIR, "eval")),
@@ -79,7 +102,7 @@ if __name__ == "__main__":
         [ts_callback, checkpoint_callback, eval_callback, save_best_callback]
     )
 
-    env = CrowdEnv(config, "train")
+    env = CrowdEnv(args.config)
     env = Monitor(env, str(Path(LOG_DIR, "train")), allow_early_resets=True)
     env = DummyVecEnv([lambda: env] * 8)
     # env = Monitor(CrowdEnv(config, "test"))
@@ -92,19 +115,19 @@ if __name__ == "__main__":
         features_extractor_class=PairwiseAttentionFeaturesExtractor,
         features_extractor_kwargs=dict(dims=network_dims),
         activation_fn=th.nn.ReLU,
-        net_arch=[150, 100, 100, dict(pi=[81], vf=[1])],
+        net_arch=[150, 100, 100, dict(pi=[env.action_space.n], vf=[1])],
     )
     model = PPO(
         "MlpPolicy",
         env,
         policy_kwargs=policy_kwargs,
-        learning_rate=2.5e-4,
+        learning_rate=linear_schedule(2.5e-4),
         gamma=0.99,
         gae_lambda=0.95,
         n_steps=16,
         n_epochs=4,
         batch_size=128,
-        clip_range=0.1,
+        clip_range=linear_schedule(0.1),
         vf_coef=0.5,
         ent_coef=0.01,
         verbose=0,
