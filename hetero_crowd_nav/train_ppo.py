@@ -33,6 +33,7 @@ def set_random_seeds(seed):
     torch.cuda.manual_seed_all(seed)
     return None
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Parse configuration file")
     parser.add_argument("--policy", type=str, default="cadrl")
@@ -54,7 +55,7 @@ if __name__ == "__main__":
 
     set_random_seeds(args.randomseed)
 
-     configure paths
+    # configure paths
     if args.debug:  # overwrite debug output by default
         if args.tag is None:
             args.tag = "debug"
@@ -116,5 +117,3 @@ if __name__ == "__main__":
     logger.info("Device: %s", device)
     logger.info("-" * 80)
     writer = SummaryWriter(log_dir=output_dir)
-
-    

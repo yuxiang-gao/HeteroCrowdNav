@@ -1,32 +1,91 @@
+import os
 import numpy as np
 import time
 from pandas import DataFrame
 
-from stable_baselines3.common.callbacks import BaseCallback, EvalCallBack
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.results_plotter import load_results, ts2xy
+from stable_baselines3.common.noise import NormalActionNoise
+from stable_baselines3.common.callbacks import BaseCallback
 
 
-class LogCallBack(BaseCallback):
+class SaveOnBestTrainingRewardCallback(BaseCallback):
     """
-    A custom callback that derives from ``BaseCallback``.
+    Callback for saving a model (the check is done every ``check_freq`` steps)
+    based on the training reward (in practice, we recommend using ``EvalCallback``).
 
-    :param log_path: (string) where to save the training log
-    :param eval_interval: (int) frequency fo evaluation
-    :param verbose: (int) Verbosity level 0: not output 1: info 2: debug
-    :param verbose: (int) Verbosity level 0: not output 1: info 2: debug
+    :param check_freq: (int)
+    :param log_dir: (str) Path to the folder where the model will be saved.
+      It must contains the file created by the ``Monitor`` wrapper.
+    :param verbose: (int)
     """
 
-    def __init__(
-        self,
-        log_path: str = None,
-        eval_interval: int = 10000,
-        verbose: int = 1,
-    ) -> None:
-        super(LogCallBack, self).__init__(verbose)
-        self.log_path = log_path
-        self.eval_interval = eval_interval
+    def __init__(self, check_freq: int, log_dir: str, verbose=1):
+        super(SaveOnBestTrainingRewardCallback, self).__init__(verbose)
+        self.check_freq = check_freq
+        self.log_dir = log_dir
+        self.save_path = os.path.join(log_dir, "best_model")
+        self.best_mean_reward = -np.inf
+
+    def _init_callback(self) -> None:
+        # Create folder if needed
+        if self.save_path is not None:
+            os.makedirs(self.save_path, exist_ok=True)
 
     def _on_step(self) -> bool:
-        """
-        This method will be called by the model after each call to `env.step()`.
-        :return: (bool) If the callback returns False, training is aborted early.
-        """
+        if self.n_calls % self.check_freq == 0:
+
+            # Retrieve training reward
+            x, y = ts2xy(load_results(self.log_dir), "timesteps")
+            if len(x) > 0:
+                # Mean training reward over the last 100 episodes
+                mean_reward = np.mean(y[-100:])
+                if self.verbose > 0:
+                    print(f"Num timesteps: {self.num_timesteps}")
+                    print(
+                        f"Best mean reward: {self.best_mean_reward:.2f} - Last mean reward per episode: {mean_reward:.2f}"
+                    )
+                # New best model, you could save the agent here
+                if mean_reward > self.best_mean_reward:
+                    self.best_mean_reward = mean_reward
+                    # Example for saving best model
+                    if self.verbose > 0:
+                        print(f"Saving new best model to {self.save_path}.zip")
+                    self.model.save(self.save_path)
+
+        return True
+
+
+class TensorboardCallback(BaseCallback):
+    """
+    Custom callback for plotting additional values in tensorboard.
+    """
+
+    def __init__(self, verbose=0):
+        super(TensorboardCallback, self).__init__(verbose)
+
+    def _on_step(self) -> bool:
+        # Log scalar value (here a random variable)
+        envs = self.training_env.envs
+        infos = []
+        for i, env in enumerate(envs):
+            info = env.sim.episode_info
+            self._log_dict(info["rewards"], prefix="rewards/", sum=True)
+
+        # self.logger.record("random_value", value)
+        return True
+
+    def _log_dict(self, rewards_dict, prefix="", sum=False):
+        sum = 0
+        for key, value in rewards_dict.items():
+            sum += value
+            self.logger.record_mean(prefix + key, value)
+        if sum:
+            self.logger.record(prefix + "total", sum)
+
+    def _on_training_end(self) -> None:
+        envs = self.training_env.envs
+        infos = []
+        for i, env in enumerate(envs):
+            info = env.sim.episode_info
+            print(info["events"])

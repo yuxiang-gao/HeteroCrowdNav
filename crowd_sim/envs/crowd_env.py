@@ -58,9 +58,9 @@ class CrowdEnv(gym.Env):
         self.observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=((sum(self.num_human) + len(self.obstacles_as_agent)), 13),
+            shape=((sum(self.num_human) + len(self.obstacles_as_agent)), 15),
             dtype=np.float32,
-        )  # gx, gy, vx, vy, v_pref, theta, radius, px1, py1, vx1,vy1, radius1, role
+        )  # gx, gy, vx, vy, v_pref, theta, radius, px1, py1, vx1,vy1, radius1, role_onehot (obstacles, waiter, guest)
 
         self.viewer = None
 
@@ -107,7 +107,7 @@ class CrowdEnv(gym.Env):
 
         robot = env.robot
 
-        policy = policy_factory["linear"]()
+        policy = policy_factory["dummy"]()
         policy.configure(self.config)
         policy.set_env(policy)
         robot.set_policy(policy)
@@ -115,6 +115,7 @@ class CrowdEnv(gym.Env):
         return env, robot
 
     def _convert_obs(self, flatten=False):
+        agent_onehot_encoder = np.eye(3).tolist()
         robot = self.sim.robot
         humans = self.sim.humans
         robot_state = (
@@ -140,8 +141,8 @@ class CrowdEnv(gym.Env):
                 agent.vx - robot_state.vx,
                 agent.vy - robot_state.vy,
                 agent.radius,
-                agent.type_idx,
-            ]
+            ] + agent_onehot_encoder[agent.type_idx]
+
             obs.append(robot_ob + human_ob)
         for obstacle in self.obstacles_as_agent:
             obstacle_ob = [
@@ -150,8 +151,7 @@ class CrowdEnv(gym.Env):
                 obstacle.vx - robot_state.vx,
                 obstacle.vy - robot_state.vy,
                 obstacle.radius,
-                -1,
-            ]
+            ] + agent_onehot_encoder[0]
             obs.append(robot_ob + obstacle_ob)
         if flatten:
             obs = np.array(obs).flatten()
@@ -457,7 +457,7 @@ if __name__ == "__main__":
     from crowd_sim.envs.utils.config import Config
     from crowd_sim.envs.utils.logging import logging_init
 
-    config = Config("configs/configs_hetero.toml")
+    config = Config("crowd_nav/configs/configs_hetero.toml")
 
     env = CrowdEnv(config)
     player = EnvPlayer(env, render_mode="human")
