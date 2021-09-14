@@ -1,3 +1,4 @@
+from crowd_sim.envs.policy.dummy import Dummy
 from crowd_sim.envs.policy.linear import Linear
 from crowd_sim.envs.policy.orca import ORCA, CentralizedORCA
 from crowd_sim.envs.policy.socialforce import (
@@ -11,6 +12,7 @@ def none_policy():
 
 
 policy_factory = dict()
+policy_factory["dummy"] = Dummy
 policy_factory["linear"] = Linear
 policy_factory["orca"] = ORCA
 policy_factory["socialforce"] = SocialForce

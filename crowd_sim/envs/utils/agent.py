@@ -145,7 +145,7 @@ class Agent(object):
 
     def compute_position(self, action, delta_t):
         self.check_validity(action)
-        if self.kinematics == "holonomic":
+        if isinstance(action, ActionXY):
             px = self.px + action.vx * delta_t
             py = self.py + action.vy * delta_t
         elif isinstance(action, ActionRot):
@@ -162,10 +162,10 @@ class Agent(object):
         self.check_validity(action)
         pos = self.compute_position(action, self.time_step)
         self.px, self.py = pos
-        if self.kinematics == "holonomic":
+        if isinstance(action, ActionXY):
             self.vx = action.vx
             self.vy = action.vy
-        else:
+        elif isinstance(action, ActionRot):
             self.theta = (self.theta + action.r) % (2 * np.pi)
             self.vx = action.v * np.cos(self.theta)
             self.vy = action.v * np.sin(self.theta)
