@@ -165,6 +165,7 @@ class Agent(object):
         if isinstance(action, ActionXY):
             self.vx = action.vx
             self.vy = action.vy
+            self.theta = np.arctan2(self.vy, self.vx)
         elif isinstance(action, ActionRot):
             self.theta = (self.theta + action.r) % (2 * np.pi)
             self.vx = action.v * np.cos(self.theta)
