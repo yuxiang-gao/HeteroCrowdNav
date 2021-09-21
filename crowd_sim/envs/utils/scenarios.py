@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 class Scenario(str, Enum):
     CIRCLE_CROSSING = "circle_crossing"
+    SQUARE_CROSSING = "square_crossing"
     CORRIDOR = "corridor"
     LONG_CORRIDOR = "long_corridor"
     CORNER = "corner"
@@ -50,7 +51,7 @@ class ScenarioManager(object):
         self.scenario_config = None
         self.map_size = None
         self.obstacles = []  # x_min,x_max, y_min, y_max
-        self.polygon_obstacles = None
+        self.polygon_obstacles = []
         self.spawn_positions = []
 
         self.rng = np.random.default_rng(seed)
@@ -59,6 +60,7 @@ class ScenarioManager(object):
         else:
             self.scenario = Scenario.find(scenario)
         self.configure(config)
+        self.generate_scenario()
 
     def configure(self, config):
         self.config = config
@@ -71,6 +73,7 @@ class ScenarioManager(object):
         #     self.human_radius.append(human["radius"])
         self.discomfort_dist = config("reward", "discomfort_dist")
 
+    def generate_scenario(self):
         if self.scenario == Scenario.CORNER:
             width = self.scenario_config("width")
             self.obstacles = np.array(
@@ -120,8 +123,8 @@ class ScenarioManager(object):
         elif self.scenario == Scenario.CIRCLE_CROSSING:
             self.circle_radius = self.scenario_config("circle_radius")
             self.robot_spawn_positions = [
-                [0, -self.circle_radius],
-                [0, self.circle_radius],
+                [0, -self.circle_radius - 1],
+                [0, self.circle_radius + 1],
             ]
         elif self.scenario == Scenario.COCKTAIL_PARTY:
             table_placement = np.array(

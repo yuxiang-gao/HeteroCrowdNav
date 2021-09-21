@@ -228,7 +228,7 @@ class CrowdSim(gym.Env):
         else:
             self.scene_manager.set_scenario(scenario, seed)
 
-    def reset(self, phase="test", test_case=None):
+    def reset(self, phase="train", test_case=None, scenario=None):
         """
         Set px, py, gx, gy, vx, vy, theta for robot and humans
         :return:
@@ -250,7 +250,7 @@ class CrowdSim(gym.Env):
                 self.human_num if self.robot.policy.multiagent_training else [1]
             )
             seed = counter_offset[phase] + self.case_counter[phase]
-            self.set_scene(self.phase_scenario[phase], seed)
+            self.set_scene(scenario or self.phase_scenario[phase], seed)
             self.scene_manager.spawn(
                 num_human=human_num,
                 set_robot=True,

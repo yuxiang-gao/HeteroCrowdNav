@@ -1,3 +1,4 @@
+from crowd_sim.envs.policy.policy_factory import none_policy
 import enum
 import logging
 import threading
@@ -16,7 +17,7 @@ from crowd_sim.envs.crowd_sim import CrowdSim
 from crowd_sim.envs.utils.robot import Robot
 from crowd_sim.envs.utils.action import ActionRot, ActionXY
 from crowd_sim.envs.utils.state import ObservableState
-from crowd_sim.envs.utils.config import Config
+from crowd_sim.envs.utils.config import Config, DEFAULT_CONFIG
 from crowd_nav.policy.policy_factory import policy_factory
 
 logger = logging.getLogger(__name__)
@@ -26,19 +27,30 @@ gym.logger.set_level(40)
 class CrowdEnv(gym.Env):
     metadata = {"render.modes": ["human", "traj", "video"]}
 
-    def __init__(self, conf=None, phase="train") -> None:
+    def __init__(
+        self,
+        conf=None,
+        phase="train",
+        discrete_action=True,
+        scenarios=["cocktail_party"],
+        legacy_action_space=True,
+    ) -> None:
         super(CrowdEnv, self).__init__()
         if isinstance(conf, str) or isinstance(conf, Path):
             self.config = Config(conf)
         elif isinstance(conf, Config):
-            self.config = config
+            self.config = conf
+        elif conf is None:
+            self.config = Config(DEFAULT_CONFIG)
         self.phase = phase
+        self.scenarios = scenarios
         self.sim = None
         self.robot = None
         self.total_steps = 0
         self.steps_since_reset = None
         self.episode_reward = None
         self.obstacles_as_agent = None
+        self.v_pref = 1.2
 
         self.sim, self.robot = self._make_env()
         self.sim.reset()
@@ -54,12 +66,17 @@ class CrowdEnv(gym.Env):
         self.rotation_constraint = 10 / 180 * np.pi
         self.num_human = self.config("env", "agents", "human_num")
         x_lim, y_lim = self.config("env", "scenarios", "map_size")
-        self._build_action_space(1.2)
+        self._build_action_space(self.v_pref, legacy_action_space)
 
-        # self.action_space = spaces.Box(
-        #     low=-1, high=1, shape=(2,), dtype=np.float32
-        # )  # vel, rot
-        self.action_space = spaces.Discrete(len(self.action_spaces))
+        if discrete_action:
+            self.action_space = spaces.Discrete(len(self.action_spaces))
+        else:
+            self.action_space = spaces.Box(
+                low=np.array([-0.5, -1]),  # limit backup speed
+                high=np.array([1, 1]),
+                shape=(2,),
+                dtype=np.float32,
+            )  # vel, rot
         self.observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
@@ -75,7 +92,9 @@ class CrowdEnv(gym.Env):
     def reset(self):
         self.steps_since_reset = 0
         self.episode_reward = 0
-        self.sim.reset(self.phase)
+        self.sim.reset(
+            phase=self.phase, scenario=np.random.choice(self.scenarios)
+        )
         obs = self._convert_obs()
         return obs
 
@@ -92,7 +111,10 @@ class CrowdEnv(gym.Env):
             if self.robot.kinematics == "holonomic":
                 input_action = ActionXY(action[0], action[1])
             else:
-                input_action = ActionRot(action[0], action[1] * np.pi)
+                input_action = ActionRot(
+                    action[0] * self.v_pref,
+                    action[1] * self.rotation_constraint,
+                )
         else:
             input_action = self.action_spaces[action]
 
@@ -202,7 +224,7 @@ class CrowdEnv(gym.Env):
         )
         return agent_state_obs
 
-    def _build_action_space(self, v_pref):
+    def _build_action_space(self, v_pref, legacy_action_space=True):
         """
         Action space consists of 25 uniformly sampled actions in permitted range and 25 randomly sampled actions.
         """
@@ -211,7 +233,10 @@ class CrowdEnv(gym.Env):
             (np.exp((i + 1) / self.speed_samples) - 1) / (np.e - 1) * v_pref
             for i in range(self.speed_samples)
         ]
-        speeds = [-s for s in reversed(speeds)] + [0] + speeds
+        if legacy_action_space:
+            speeds = [-s for s in reversed(speeds)] + [0] + speeds
+        else:
+            speeds = [-v_pref / 3, 0] + speeds
         if holonomic:
             rotations = np.linspace(
                 0, 2 * np.pi, self.rotation_samples, endpoint=False

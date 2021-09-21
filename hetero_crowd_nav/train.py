@@ -67,6 +67,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output_dir", type=str, default="data/PPO")
     parser.add_argument("-n", "--num_timestep", type=int, default=1_000_000)
     parser.add_argument("-v", "--verbose", type=int, default=1)
+    parser.add_argument("-r", "--resume", action="store_true")
     args = parser.parse_args()
     # config = Config(args.config)
 
@@ -106,6 +107,7 @@ if __name__ == "__main__":
     env = Monitor(env, str(Path(LOG_DIR, "train")), allow_early_resets=True)
     env = DummyVecEnv([lambda: env] * 8)
     # env = Monitor(CrowdEnv(config, "test"))
+
     network_dims = dict(
         mlp1_dims=[150, 100, 0],
         mlp2_dims=[100, 50],
@@ -117,23 +119,42 @@ if __name__ == "__main__":
         activation_fn=th.nn.ReLU,
         net_arch=[150, 100, 100, dict(pi=[env.action_space.n], vf=[1])],
     )
-    model = PPO(
-        "MlpPolicy",
-        env,
-        policy_kwargs=policy_kwargs,
-        learning_rate=linear_schedule(2.5e-4),
-        gamma=0.99,
-        gae_lambda=0.95,
-        n_steps=16,
-        n_epochs=4,
-        batch_size=128,
-        clip_range=linear_schedule(0.1),
-        vf_coef=0.5,
-        ent_coef=0.01,
-        verbose=0,
-        seed=2021,
-        tensorboard_log=LOG_DIR,
-    )
+    if not args.resume:
+
+        model = PPO(
+            "MlpPolicy",
+            env,
+            policy_kwargs=policy_kwargs,
+            learning_rate=linear_schedule(2.5e-4),
+            gamma=0.99,
+            gae_lambda=0.95,
+            n_steps=64,  # 16
+            n_epochs=4,
+            batch_size=64,
+            clip_range=linear_schedule(0.1),
+            vf_coef=0.5,
+            ent_coef=0.01,
+            verbose=0,
+            seed=2021,
+            tensorboard_log=LOG_DIR,
+        )
+    else:
+        model = PPO.load(
+            Path(LOG_DIR, "model"),
+            env=env,
+            policy_kwargs=policy_kwargs,
+            learning_rate=linear_schedule(2.5e-4),
+            gamma=0.99,
+            gae_lambda=0.95,
+            n_steps=64,
+            n_epochs=4,
+            batch_size=64,
+            clip_range=linear_schedule(0.1),
+            vf_coef=0.5,
+            ent_coef=0.01,
+            verbose=0,
+            seed=2021,
+        )
 
     model.set_logger(logger)
 
