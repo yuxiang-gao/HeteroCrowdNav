@@ -78,7 +78,7 @@ goal_radius = 0.3
 
 
     [env.agents]
-    human_num = [2, 3]
+    human_num = [4, 8]
     perpetual = false
     centralized_planning = false
     use_groups = false

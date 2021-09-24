@@ -1,8 +1,10 @@
+from matplotlib import use
 from crowd_sim.envs.policy.policy_factory import none_policy
 import enum
 import logging
 import threading
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import gym
 from gym import spaces
@@ -25,15 +27,36 @@ gym.logger.set_level(40)
 
 
 class CrowdEnv(gym.Env):
+    """
+    Wrapping the CrowdSim env to make it gym compatible
+
+    :param conf:
+    :param phase:
+    :param scenarios: scenarios to use, ["cocktail_party", "circle_crossing"]
+    :param n_human: number of pedestrians for each type
+    :param v_pref: preferred velocity
+    :param backward_vel_coef: throttle vel when backing up
+    :param discrete_action: whether to use discrete action space
+    :param kinematics: kinematics for the robot
+    :param map_size: map size to draw
+    :return:
+    """
+
     metadata = {"render.modes": ["human", "traj", "video"]}
 
     def __init__(
         self,
         conf=None,
-        phase="train",
-        discrete_action=True,
-        scenarios=["cocktail_party"],
-        legacy_action_space=True,
+        phase: str = "train",
+        scenarios: List[str] = ["cocktail_party"],
+        n_human: List[int] = [2, 3],
+        randomize_human: bool = False,
+        v_pref: int = 1.2,
+        backward_vel_coef: float = 0.5,
+        discrete_action: bool = True,
+        kinematics: str = "nonholonomic",
+        map_size: List[int] = [10, 10],
+        use_roles: bool = True,
     ) -> None:
         super(CrowdEnv, self).__init__()
         if isinstance(conf, str) or isinstance(conf, Path):
@@ -50,13 +73,22 @@ class CrowdEnv(gym.Env):
         self.steps_since_reset = None
         self.episode_reward = None
         self.obstacles_as_agent = None
-        self.v_pref = 1.2
+
+        self.v_pref = v_pref
+        if not randomize_human:
+            self.n_human = n_human  # self.config("env", "agents", "human_num")
+        else:
+            self.n_human = [np.random.randint(2, 4), np.random.randint(4, 8)]
+        self.backward_vel_coef = backward_vel_coef
+        self.use_roles = use_roles
 
         self.sim, self.robot = self._make_env()
         self.sim.reset()
         self.obstacles_as_agent = self._obstacle_observation()
 
-        self.kinematics = self.config("policy", "action_space", "kinematics")
+        self.kinematics = (
+            kinematics  # self.config("policy", "action_space", "kinematics")
+        )
         self.speed_samples = self.config(
             "policy", "action_space", "speed_samples"
         )
@@ -64,28 +96,38 @@ class CrowdEnv(gym.Env):
             "policy", "action_space", "rotation_samples"
         )
         self.rotation_constraint = 10 / 180 * np.pi
-        self.num_human = self.config("env", "agents", "human_num")
-        x_lim, y_lim = self.config("env", "scenarios", "map_size")
-        self._build_action_space(self.v_pref, legacy_action_space)
+        x_lim, y_lim = map_size  # self.config("env", "scenarios", "map_size")
+        self._build_action_space(self.v_pref, self.backward_vel_coef)
 
         if discrete_action:
             self.action_space = spaces.Discrete(len(self.action_spaces))
         else:
             self.action_space = spaces.Box(
-                low=np.array([-0.5, -1]),  # limit backup speed
-                high=np.array([1, 1]),
+                low=-1,  # limit backup speed
+                high=1,
                 shape=(2,),
                 dtype=np.float32,
             )  # vel, rot
-        self.observation_space = spaces.Box(
-            low=-np.inf,
-            high=np.inf,
-            shape=(
-                (sum(self.num_human) + len(self.obstacles_as_agent)),
-                7 + 5 + 3,
-            ),
-            dtype=np.float32,
-        )  # gx, gy, vx, vy, v_pref, theta, radius, px1, py1, vx1,vy1, radius1, role_onehot (obstacles, waiter, guest)
+        if use_roles:
+            self.observation_space = spaces.Box(
+                low=-np.inf,
+                high=np.inf,
+                shape=(
+                    9,  # (sum(self.n_human) + len(self.obstacles_as_agent)),
+                    7 + 5 + 3,
+                ),
+                dtype=np.float32,
+            )  # gx, gy, vx, vy, v_pref, theta, radius, px1, py1, vx1,vy1, radius1, role_onehot (obstacles, waiter, guest)
+        else:
+            self.observation_space = spaces.Box(
+                low=-np.inf,
+                high=np.inf,
+                shape=(
+                    9,  # (sum(self.n_human) + len(self.obstacles_as_agent)),
+                    7 + 5,
+                ),
+                dtype=np.float32,
+            )  # gx, gy, vx, vy, v_pref, theta, radius, px1, py1, vx1,vy1, radius1
 
         self.viewer = None
 
@@ -108,6 +150,8 @@ class CrowdEnv(gym.Env):
             or isinstance(action, list)
             or isinstance(action, np.ndarray)
         ):
+            if action[0] < 0:  # throttle backward movement
+                action[0] *= self.backward_vel_coef
             if self.robot.kinematics == "holonomic":
                 input_action = ActionXY(action[0], action[1])
             else:
@@ -133,6 +177,7 @@ class CrowdEnv(gym.Env):
     def _make_env(self):
         env = gym.make("CrowdSim-v0")
         env.configure(self.config("env"))
+        env.set_human_num(self.n_human)  # pass on human number
 
         robot = env.robot
 
@@ -170,7 +215,9 @@ class CrowdEnv(gym.Env):
                 agent.vx - robot_state.vx,
                 agent.vy - robot_state.vy,
                 agent.radius,
-            ] + agent_onehot_encoder[agent.type_idx]
+            ]
+            if self.use_roles:
+                human_ob += agent_onehot_encoder[agent.type_idx]
 
             obs.append(robot_ob + human_ob)
         for obstacle in self.obstacles_as_agent:
@@ -180,8 +227,13 @@ class CrowdEnv(gym.Env):
                 obstacle.vx - robot_state.vx,
                 obstacle.vy - robot_state.vy,
                 obstacle.radius,
-            ] + agent_onehot_encoder[0]
+            ]
+            if self.use_roles:
+                obstacle_ob += agent_onehot_encoder[0]
             obs.append(robot_ob + obstacle_ob)
+        # sort by distance and take only the closest
+        obs = sorted(obs, key=lambda x: x[7] ** 2 + x[8] ** 2)
+        obs = obs[: self.observation_space.shape[0]]
         if flatten:
             obs = np.array(obs).flatten()
         else:
@@ -224,7 +276,7 @@ class CrowdEnv(gym.Env):
         )
         return agent_state_obs
 
-    def _build_action_space(self, v_pref, legacy_action_space=True):
+    def _build_action_space(self, v_pref, backward_vel_coef):
         """
         Action space consists of 25 uniformly sampled actions in permitted range and 25 randomly sampled actions.
         """
@@ -233,10 +285,8 @@ class CrowdEnv(gym.Env):
             (np.exp((i + 1) / self.speed_samples) - 1) / (np.e - 1) * v_pref
             for i in range(self.speed_samples)
         ]
-        if legacy_action_space:
-            speeds = [-s for s in reversed(speeds)] + [0] + speeds
-        else:
-            speeds = [-v_pref / 3, 0] + speeds
+        # speeds = [-s for s in reversed(speeds)] + [0] + speeds
+        speeds = [-v_pref * backward_vel_coef, 0] + speeds
         if holonomic:
             rotations = np.linspace(
                 0, 2 * np.pi, self.rotation_samples, endpoint=False

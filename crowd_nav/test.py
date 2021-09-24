@@ -102,8 +102,8 @@ def main():
         policy.load_model(model_weights)
 
     # configure environment
-    if args.human_num is not None:
-        env_config.sim.human_num = args.human_num
+    if args.n_human is not None:
+        env_config.sim.n_human = args.n_human
     env = gym.make("CrowdSim-v0")
     env.configure(env_config)
     robot = env.robot

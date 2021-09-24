@@ -155,7 +155,7 @@ class ValueNetwork(nn.Module):
                     np.zeros(
                         (
                             1,
-                            self.env.max_humans - sum(self.env.human_num),
+                            self.env.max_humans - sum(self.env.n_human),
                             ob.shape[2],
                         )
                     ),
@@ -263,7 +263,7 @@ class HARL(MultiHumanRL):
                     np.zeros(
                         (
                             1,
-                            self.env.max_humans - self.env.human_num,
+                            self.env.max_humans - self.env.n_human,
                             ob.shape[2],
                         )
                     ),
